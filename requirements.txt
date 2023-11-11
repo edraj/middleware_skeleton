@@ -1,0 +1,17 @@
+python-json-logger
+json_logging
+fastapi
+pydantic
+pyjwt
+jinja2
+pydantic[email,dotenv]
+concurrent-log-handler
+hypercorn
+aiohttp
+passlib[bcrypt]
+pytest
+pytest-asyncio
+requests
+cryptography
+asgi_correlation_id
+fastapi-mail
