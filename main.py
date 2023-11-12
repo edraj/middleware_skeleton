@@ -1,4 +1,5 @@
-#!/usr/bin/env -S BACKEND_ENV=secrets.env python3.11
+#!/usr/bin/env -S BACKEND_ENV=config.env python3
+
 """ FastApi Main module """
 
 import asyncio

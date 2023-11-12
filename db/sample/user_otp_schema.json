@@ -1,0 +1,26 @@
+{
+    "title": "Acme User OTP",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+        "user_shortname": {
+            "type": "string"
+        },
+        "otp_for": {
+            "type": "string",
+            "enum": [
+                "mail_verification",
+                "phone_verification",
+                "reset_password"
+            ]
+        },
+        "otp": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "user_shortname",
+        "otp_for",
+        "otp"
+    ]
+}

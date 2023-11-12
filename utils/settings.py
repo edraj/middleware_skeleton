@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     mail_user_credentials: bool = True
     mail_validate_certs: bool = True
 
+    sms_provider_host: str = ""
+    mock_sms_provider: bool = True
+
     api_key: str = ""
     servername: str = ""  # This is for print purposes only.
     env_servername: str = ""  # server name in code.

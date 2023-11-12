@@ -1,0 +1,26 @@
+{
+    "shortname_title": "Users OTPs",
+    "content_schema_shortnames": [
+        "user_otp"
+    ],
+    "index_attributes": [
+        {
+            "key": "shortname",
+            "name": "Username"
+        },
+        {
+            "key": "user_shortname",
+            "name": "User"
+        },
+        {
+            "key": "otp_for",
+            "name": "OTP For"
+        }
+    ],
+    "allow_create": true,
+    "allow_update": true,
+    "allow_delete": true,
+    "use_media": true,
+    "filter": [],
+    "allow_view": true
+}

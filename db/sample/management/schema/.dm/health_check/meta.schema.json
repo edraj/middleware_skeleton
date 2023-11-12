@@ -1,0 +1,1 @@
+{"uuid":"7248c91a-b3d2-4dc6-a07e-4bc972e9d638","shortname":"health_check","is_active":true,"tags":[],"created_at":"2023-11-11T16:22:34.671596","updated_at":"2023-11-11T16:22:34.671600","owner_shortname":"dmart","payload":{"content_type":"json","schema_shortname":"meta_schema","body":"health_check.json"}}

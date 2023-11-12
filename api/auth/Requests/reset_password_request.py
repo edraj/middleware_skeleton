@@ -3,7 +3,8 @@ from utils import regex
 
 
 class ResetPasswordRequest(BaseModel):
-    email: str = Field(pattern=regex.EMAIL)
+    email: str = Field(default=None, pattern=regex.EMAIL)
+    phone: str = Field(default=None, pattern=regex.MSISDN)
     password_confirmation: str = Field(pattern=regex.PASSWORD)
     password: str = Field(pattern=regex.PASSWORD)
     otp: str
