@@ -1,4 +1,4 @@
-#!/usr/bin/env -S BACKEND_ENV=.env python3.11
+#!/usr/bin/env -S BACKEND_ENV=config.env python3
 """ FastApi Main module """
 
 import asyncio
@@ -43,18 +43,6 @@ import socket
 import subprocess
 from api.auth.router import router as auth
 
-app = FastAPI(
-    title="Dmart Middleware API",
-    description="""A skeleton for Dmart middleware""",
-    default_response_class=MainResponse,
-    swagger_ui_parameters={"defaultModelsExpandDepth": -1},
-    version="0.0.1",
-    redoc_url=None,
-    docs_url=f"{settings.base_path}/docs",
-    openapi_url=f"{settings.base_path}/openapi.json",
-    servers=[{"url": f"{settings.base_path}/"}],
-)
-
 service_start_time: str = ""
 version: str = "unknown"
 branch_name: str = "unknown"
@@ -62,13 +50,12 @@ server_hostname: str = "unknown"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting up")
     print('{"stage":"starting up"}')
+    logger.info("Starting up")
     global service_start_time
     global version
     global branch_name
     global server_hostname
-    global service_start_time
     service_start_time = datetime.now().isoformat()
     branch_name_cmd = "git rev-parse --abbrev-ref HEAD"
     result = subprocess.run(
@@ -94,6 +81,18 @@ async def lifespan(app: FastAPI):
     logger.info("Application shutting down")
     print('{"stage":"shutting down"}')
 
+
+app = FastAPI (
+    title="Dmart Middleware API",
+    description="""A skeleton for Dmart middleware""",
+    default_response_class=MainResponse,
+    swagger_ui_parameters={"defaultModelsExpandDepth": -1},
+    version="0.0.1",
+    redoc_url=None,
+    docs_url=f"{settings.base_path}/docs",
+    openapi_url=f"{settings.base_path}/openapi.json",
+    servers=[{"url": f"{settings.base_path}/"}],
+)
 
 async def capture_body(request: Request):
     request.state.request_body = {}
