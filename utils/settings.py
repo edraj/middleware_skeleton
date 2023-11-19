@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     app_name: str = "dmart-middleware"
     app_url: str = ""
     log_file: str = "../logs/middleware.ljson.log"
-    log_handlers: list[str] = ["file"]
+    log_handlers: list[str] = ["console", "file"]
     jwt_secret: str = ""
     jwt_algorithm: str = ""
     jwt_access_expires: int = 14400
@@ -48,6 +48,12 @@ class Settings(BaseSettings):
 
     facebook_client_id: str = ""
     facebook_client_secret: str = ""
+    
+    github_client_id: str = ""
+    github_client_secret: str = ""
+    
+    microsoft_client_id: str = ""
+    microsoft_client_secret: str = ""
 
     model_config = SettingsConfigDict(env_file = os.getenv("BACKEND_ENV", "config.env"), env_file_encoding = "utf-8")
 settings = Settings()
