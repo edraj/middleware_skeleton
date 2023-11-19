@@ -1,7 +1,6 @@
 """ Application Settings """
 
 import os
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,10 +22,13 @@ class Settings(BaseSettings):
     dmart_password: str = ""
     debug_enabled: bool = True
 
+
+    base_path: str = "/middleware"
+
     mail_username: str = ""
     mail_password: str = ""
     mail_from: str = ""
-    mail_port: str = ""
+    mail_port: int = 25
     mail_server: str = ""
     mail_start_tls: bool = False
     mail_ssl_tls: bool = True
@@ -40,11 +42,8 @@ class Settings(BaseSettings):
     servername: str = ""  # This is for print purposes only.
     env_servername: str = ""  # server name in code.
 
-    class Config:
-        env_file: str = ".env"
-        env_file_encoding = "utf-8"
 
-
+    model_config = SettingsConfigDict(env_file = os.getenv("BACKEND_ENV", "config.env"), env_file_encoding = "utf-8")
 settings = Settings()
 # Uncomment this when you have a problem running the app to see if you have a problem with the env file
 # print(settings.model_dump_json())

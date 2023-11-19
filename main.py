@@ -8,7 +8,6 @@ import sys
 import time
 import traceback
 from datetime import datetime
-from os.path import exists
 from typing import Any
 from asgi_correlation_id import CorrelationIdMiddleware
 import json_logging
@@ -22,6 +21,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from urllib.parse import quote
 from utils.logger import logging_schema
 from pydantic import ValidationError
+from contextlib import asynccontextmanager
 
 # from api.number.router import router as number
 # from api.number_v2.router import router as number_v2
@@ -54,6 +54,9 @@ app = FastAPI(
     swagger_ui_parameters={"defaultModelsExpandDepth": -1},
     version="0.0.1",
     redoc_url=None,
+    docs_url=f"{settings.base_path}/docs",
+    openapi_url=f"{settings.base_path}/openapi.json",
+    servers=[{"url": f"{settings.base_path}/"}],
 )
 
 service_start_time: str = ""
@@ -62,9 +65,10 @@ branch_name: str = "unknown"
 server_hostname: str = "unknown"
 
 
-@app.on_event("startup")
-async def app_startup():
-    logger.info("Starting")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Starting up")
+    print('{"stage":"starting up"}')
     global service_start_time
     global version
     global branch_name
@@ -90,10 +94,10 @@ async def app_startup():
                 responses.pop("422")
     app.openapi_schema = openapi_schema
 
+    yield
 
-@app.on_event("shutdown")
-async def app_shutdown():
-    logger.info("Application shutdown")
+    logger.info("Application shutting down")
+    print('{"stage":"shutting down"}')
 
 
 async def capture_body(request: Request):
