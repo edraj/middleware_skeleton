@@ -62,14 +62,21 @@
             "type": "boolean",
             "title": "Is phone verified",
             "default": false
+        },
+        "google_id": {
+            "type": "string"
+        },
+        "facebook_id": {
+            "type": "string"
+        },
+        "twitter_id": {
+            "type": "string"
         }
     },
     "required": [
         "first_name",
         "last_name",
         "email",
-        "phone",
-        "password",
-        "phone"
+        "password"
     ]
 }

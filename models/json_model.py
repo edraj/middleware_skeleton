@@ -64,6 +64,18 @@ class JsonModel(BaseModel):
         )
 
     @classmethod
+    async def get(cls: type[TJsonModel], shortname: str) -> TJsonModel | None:
+        model_name = snake_case(cls.__name__)
+        try:
+            await dmart.read(
+                space_name=Space.acme,
+                subpath=model_data_mapper[model_name]["subpath"],
+                shortname=shortname,
+            )
+        except Exception as _:
+            return None
+
+    @classmethod
     async def find(cls: type[TJsonModel], search: str) -> TJsonModel | None:
         model_name = snake_case(cls.__name__)
         result = await dmart.query(

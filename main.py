@@ -1,5 +1,4 @@
-#!/usr/bin/env -S BACKEND_ENV=config.env python3
-
+#!/usr/bin/env -S BACKEND_ENV=.env python3.11
 """ FastApi Main module """
 
 import asyncio
@@ -10,7 +9,6 @@ import traceback
 from datetime import datetime
 from typing import Any
 from asgi_correlation_id import CorrelationIdMiddleware
-import json_logging
 from fastapi import Depends, FastAPI, Request, Response, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -45,8 +43,6 @@ import socket
 import subprocess
 from api.auth.router import router as auth
 
-json_logging.init_fastapi(enable_json=True)
-
 app = FastAPI(
     title="Dmart Middleware API",
     description="""A skeleton for Dmart middleware""",
@@ -63,7 +59,6 @@ service_start_time: str = ""
 version: str = "unknown"
 branch_name: str = "unknown"
 server_hostname: str = "unknown"
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -114,7 +109,6 @@ async def my_exception_handler(_, exception):
     return MainResponse(
         content=exception.detail,
         status_code=exception.status_code,
-        headers={"correlation_id": json_logging.get_correlation_id()},
     )
 
 

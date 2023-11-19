@@ -1,7 +1,16 @@
+**/__pycache__
+**/*.log
+**/*.lock
+secrets.env
+**/logs/*
+**/.debug_jwt.swp
+**/.DS_Store
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+
+backend/version.txt
 
 # C extensions
 *.so
@@ -50,7 +59,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
-
+.vscode/
 # Translations
 *.mo
 *.pot
@@ -127,6 +136,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.python-version
 
 # Spyder project settings
 .spyderproject
@@ -158,3 +168,12 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+# VS Code
+*.code-workspace
+
+backend/*.dat
+K6/*.txt
+
+/venv
+venv/

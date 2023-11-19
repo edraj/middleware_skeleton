@@ -1,9 +1,11 @@
 import random
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Request
 from api.auth.Requests.login_request import LoginRequest
 from api.auth.Requests.register_request import RegisterRequest
 from api.auth.Requests.reset_password_request import ResetPasswordRequest
 from api.schemas.response import ApiException, ApiResponse, Error
+from services.facebook_sso import get_facebook_sso
+from services.google_sso import get_google_sso
 from services.sms_sender import SMSSender
 from mail.user_reset_password import UserResetPassword
 from mail.user_verification import UserVerification
@@ -14,6 +16,8 @@ from utils.helpers import escape_for_redis
 from utils.jwt import sign_jwt
 from utils.password_hashing import hash_password, verify_password
 from utils.settings import settings
+from fastapi_sso.sso.google import GoogleSSO
+from fastapi_sso.sso.facebook import FacebookSSO
 
 router = APIRouter()
 
@@ -182,10 +186,7 @@ async def login(request: LoginRequest):
         status=Status.success,
         message="Logged in successfully",
         data={
-            "user": user.model_dump(
-                exclude=["password", "password_confirmation", "full_email"],
-                exclude_none=True,
-            ),
+            "user": user.represent(),
             "token": access_token,
         },
     )
@@ -270,3 +271,81 @@ async def reset_password(request: ResetPasswordRequest):
     await user_otp.delete()
 
     return ApiResponse(status=Status.success, message="Password updated successfully")
+
+
+@router.get("/google/login")
+async def google_login(google_sso: GoogleSSO = Depends(get_google_sso)):
+    return await google_sso.get_login_redirect()
+
+
+@router.get("/google/callback")
+async def google_callback(
+    request: Request, google_sso: GoogleSSO = Depends(get_google_sso)
+):
+    user = await google_sso.verify_and_process(request)
+    user_model: User | None = await User.find(search=f"@google_id:{user.id}")
+
+    if not user_model:
+        user_model = User(
+            google_id=user.id,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            email=user.email,
+            is_email_verified=True,
+            profile_pic_url=user.picture,
+            password="GoogleAuthorized@dmart#2024",
+        )
+
+        await user_model.store(trigger_events=False)
+
+    access_token = sign_jwt(
+        {"username": user_model.shortname}, settings.jwt_access_expires
+    )
+
+    return ApiResponse(
+        status=Status.success,
+        message="Logged in successfully",
+        data={
+            "user": user_model.represent(),
+            "token": access_token,
+        },
+    )
+
+
+@router.get("/facebook/login")
+async def facebook_login(facebook_sso: FacebookSSO = Depends(get_facebook_sso)):
+    return await facebook_sso.get_login_redirect()
+
+
+@router.get("/facebook/callback")
+async def facebook_callback(
+    request: Request, facebook_sso: FacebookSSO = Depends(get_facebook_sso)
+):
+    user = await facebook_sso.verify_and_process(request)
+    user_model: User | None = await User.find(search=f"@facebook_id:{user.id}")
+
+    if not user_model:
+        user_model = User(
+            facebook_id=user.id,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            email=user.email,
+            is_email_verified=True,
+            profile_pic_url=user.picture,
+            password="FacebookAuthorized@dmart#2024",
+        )
+
+        await user_model.store(trigger_events=False)
+
+    access_token = sign_jwt(
+        {"username": user_model.shortname}, settings.jwt_access_expires
+    )
+
+    return ApiResponse(
+        status=Status.success,
+        message="Logged in successfully",
+        data={
+            "user": user_model.represent(),
+            "token": access_token,
+        },
+    )

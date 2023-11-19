@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     """Main settings class"""
 
     app_name: str = "dmart-middleware"
+    app_url: str = ""
     log_file: str = "../logs/middleware.ljson.log"
     log_handlers: list[str] = ["file"]
     jwt_secret: str = ""
@@ -42,6 +43,11 @@ class Settings(BaseSettings):
     servername: str = ""  # This is for print purposes only.
     env_servername: str = ""  # server name in code.
 
+    google_client_id: str = ""
+    google_client_secret: str = ""
+
+    facebook_client_id: str = ""
+    facebook_client_secret: str = ""
 
     model_config = SettingsConfigDict(env_file = os.getenv("BACKEND_ENV", "config.env"), env_file_encoding = "utf-8")
 settings = Settings()
