@@ -22,6 +22,9 @@ class User(JsonModel):
     google_id: str | None = None
     facebook_id: str | None = None
     twitter_id: str | None = None
+    github_id: str | None = None
+    microsoft_id: str | None = None
+    
 
     async def store(self, trigger_events: True):
         self.password = hash_password(self.password)
@@ -41,6 +44,8 @@ class User(JsonModel):
                 "google_id",
                 "facebook_id",
                 "twitter_id",
+                "github_id",
+                "microsoft_id",
             ],
             exclude_none=True,
         )

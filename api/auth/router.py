@@ -5,7 +5,9 @@ from api.auth.Requests.register_request import RegisterRequest
 from api.auth.Requests.reset_password_request import ResetPasswordRequest
 from api.schemas.response import ApiException, ApiResponse, Error
 from services.facebook_sso import get_facebook_sso
+from services.github_sso import get_github_sso
 from services.google_sso import get_google_sso
+from services.microsoft_sso import get_microsoft_sso
 from services.sms_sender import SMSSender
 from mail.user_reset_password import UserResetPassword
 from mail.user_verification import UserVerification
@@ -18,6 +20,8 @@ from utils.password_hashing import hash_password, verify_password
 from utils.settings import settings
 from fastapi_sso.sso.google import GoogleSSO
 from fastapi_sso.sso.facebook import FacebookSSO
+from fastapi_sso.sso.github import GithubSSO
+from fastapi_sso.sso.microsoft import MicrosoftSSO
 
 router = APIRouter()
 
@@ -333,6 +337,86 @@ async def facebook_callback(
             is_email_verified=True,
             profile_pic_url=user.picture,
             password="FacebookAuthorized@dmart#2024",
+        )
+
+        await user_model.store(trigger_events=False)
+
+    access_token = sign_jwt(
+        {"username": user_model.shortname}, settings.jwt_access_expires
+    )
+
+    return ApiResponse(
+        status=Status.success,
+        message="Logged in successfully",
+        data={
+            "user": user_model.represent(),
+            "token": access_token,
+        },
+    )
+
+
+
+@router.get("/github/login")
+async def github_login(github_sso: GithubSSO = Depends(get_github_sso)):
+    return await github_sso.get_login_redirect()
+
+
+@router.get("/github/callback")
+async def github_callback(
+    request: Request, github_sso: GithubSSO = Depends(get_github_sso)
+):
+    user = await github_sso.verify_and_process(request)
+    user_model: User | None = await User.find(search=f"@github_id:{user.id}")
+
+    if not user_model:
+        user_model = User(
+            github_id=user.id,
+            first_name=user.display_name,
+            last_name="",
+            email=user.email,
+            is_email_verified=True,
+            profile_pic_url=user.picture,
+            password="GithubAuthorized@dmart#2024",
+        )
+
+        await user_model.store(trigger_events=False)
+
+    access_token = sign_jwt(
+        {"username": user_model.shortname}, settings.jwt_access_expires
+    )
+
+    return ApiResponse(
+        status=Status.success,
+        message="Logged in successfully",
+        data={
+            "user": user_model.represent(),
+            "token": access_token,
+        },
+    )
+
+
+
+@router.get("/microsoft/login")
+async def microsoft_login(microsoft_sso: MicrosoftSSO = Depends(get_microsoft_sso)):
+    return await microsoft_sso.get_login_redirect()
+
+
+@router.get("/microsoft/callback")
+async def microsoft_callback(
+    request: Request, microsoft_sso: MicrosoftSSO = Depends(get_microsoft_sso)
+):
+    user = await microsoft_sso.verify_and_process(request)
+    user_model: User | None = await User.find(search=f"@microsoft_id:{user.id}")
+
+    if not user_model:
+        user_model = User(
+            microsoft_id=user.id,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            email=user.email,
+            is_email_verified=True,
+            profile_pic_url=user.picture,
+            password="MicrosoftAuthorized@dmart#2024",
         )
 
         await user_model.store(trigger_events=False)

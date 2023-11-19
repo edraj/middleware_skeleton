@@ -71,6 +71,12 @@
         },
         "twitter_id": {
             "type": "string"
+        },
+        "github_id": {
+            "type": "string"
+        },
+        "microsoft_id": {
+            "type": "string"
         }
     },
     "required": [
