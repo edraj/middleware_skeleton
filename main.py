@@ -83,8 +83,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI (
-    title="Dmart Middleware API",
-    description="""A skeleton for Dmart middleware""",
+    lifespan=lifespan,
+    title="Middleware API",
+    description="""Middleware uservice""",
     default_response_class=MainResponse,
     swagger_ui_parameters={"defaultModelsExpandDepth": -1},
     version="0.0.1",
