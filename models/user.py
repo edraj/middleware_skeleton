@@ -26,7 +26,7 @@ class User(JsonModel):
     microsoft_id: str | None = None
     
 
-    async def store(self, trigger_events: True):
+    async def store(self, trigger_events: bool = True):
         self.password = hash_password(self.password)
         self.full_email = [self.email]
 
