@@ -93,6 +93,7 @@ app = FastAPI (
     docs_url=f"{settings.base_path}/docs",
     openapi_url=f"{settings.base_path}/openapi.json",
     servers=[{"url": f"{settings.base_path}/"}],
+    lifespan=lifespan
 )
 
 async def capture_body(request: Request):

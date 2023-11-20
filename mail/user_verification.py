@@ -1,3 +1,4 @@
+from fastapi.logger import logger
 from fastapi_mail import MessageSchema, MessageType
 from utils.mailer import mailer
 
@@ -14,5 +15,10 @@ class UserVerification:
             body=html,
             subtype=MessageType.html,
         )
-
-        await mailer.send_message(message)
+        try:
+            await mailer.send_message(message)
+        except Exception as e:
+            logger.error(
+                "UserVerification",
+                extra={"props": {"email": email, "response": e.args}},
+            )
