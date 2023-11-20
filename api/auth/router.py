@@ -4,6 +4,7 @@ from api.auth.Requests.login_request import LoginRequest
 from api.auth.Requests.register_request import RegisterRequest
 from api.auth.Requests.reset_password_request import ResetPasswordRequest
 from api.schemas.response import ApiException, ApiResponse, Error
+from models.inactive_token import InactiveToken
 from services.facebook_sso import get_facebook_sso
 from services.github_sso import get_github_sso
 from services.google_sso import get_google_sso
@@ -15,7 +16,7 @@ from models.user import User
 from models.enums import OTPFor, Status
 from models.user_otp import UserOtp
 from utils.helpers import escape_for_redis
-from utils.jwt import sign_jwt
+from utils.jwt import JWTBearer, sign_jwt
 from utils.password_hashing import hash_password, verify_password
 from utils.settings import settings
 from fastapi_sso.sso.google import GoogleSSO
@@ -355,7 +356,6 @@ async def facebook_callback(
     )
 
 
-
 @router.get("/github/login")
 async def github_login(github_sso: GithubSSO = Depends(get_github_sso)):
     return await github_sso.get_login_redirect()
@@ -395,7 +395,6 @@ async def github_callback(
     )
 
 
-
 @router.get("/microsoft/login")
 async def microsoft_login(microsoft_sso: MicrosoftSSO = Depends(get_microsoft_sso)):
     return await microsoft_sso.get_login_redirect()
@@ -433,3 +432,28 @@ async def microsoft_callback(
             "token": access_token,
         },
     )
+
+
+@router.post("/logout")
+async def logout(
+    request: Request,
+):
+    decoded_data = await JWTBearer().extract_and_decode(request)
+    user: User | None = await User.get(decoded_data.get("data", {}).get("username"))
+
+    if not user:
+        raise ApiException(
+            status_code=404,
+            error=Error(type="db", code=12, message="User not found"),
+        )
+
+    if user.firebase_token:
+        user.firebase_token = None
+        user.sync()
+
+    inactive_token = InactiveToken(
+        token=decoded_data.get("token"), expires=str(decoded_data.get("expires"))
+    )
+    await inactive_token.store()
+
+    return ApiResponse(status=Status.success, message="Logged out successfully")

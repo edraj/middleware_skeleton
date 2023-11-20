@@ -4,11 +4,19 @@ from typing import Optional, Any
 from fastapi import Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from api.schemas.response import ApiException, Error
+from models.inactive_token import InactiveToken
 
 from utils.settings import settings
 
 
-def decode_jwt(token: str) -> dict[str, Any]:
+async def decode_jwt(token: str) -> dict[str, Any]:
+    inactive = await InactiveToken.find(f"@token:{token}")
+    if inactive:
+        raise ApiException(
+            status.HTTP_401_UNAUTHORIZED,
+            Error(type="jwtauth", code=12, message="Invalid Token [1]"),
+        )
+
     decoded_token: dict
     try:
         decoded_token = jwt.decode(
@@ -17,7 +25,7 @@ def decode_jwt(token: str) -> dict[str, Any]:
     except Exception:
         raise ApiException(
             status.HTTP_401_UNAUTHORIZED,
-            Error(type="jwtauth", code=12, message="Invalid Token [1]"),
+            Error(type="jwtauth", code=12, message="Invalid Token [2]"),
         )
     if (
         not decoded_token
@@ -26,7 +34,7 @@ def decode_jwt(token: str) -> dict[str, Any]:
     ):
         raise ApiException(
             status.HTTP_401_UNAUTHORIZED,
-            Error(type="jwtauth", code=12, message="Invalid Token [2]"),
+            Error(type="jwtauth", code=12, message="Invalid Token [3]"),
         )
     if decoded_token["expires"] <= time():
         raise ApiException(
@@ -34,10 +42,7 @@ def decode_jwt(token: str) -> dict[str, Any]:
             Error(type="jwtauth", code=13, message="Expired Token"),
         )
 
-    if isinstance(decoded_token["data"], dict):
-        return decoded_token["data"]
-    else:
-        return {}
+    return decoded_token
 
 
 class JWTBearer(HTTPBearer):
@@ -52,16 +57,16 @@ class JWTBearer(HTTPBearer):
                 JWTBearer, self
             ).__call__(request)
             if credentials and credentials.scheme == "Bearer":
-                decoded = decode_jwt(credentials.credentials)
-                if decoded and "username" in decoded:
-                    user_shortname = decoded["username"]
+                decoded = await decode_jwt(credentials.credentials)
+                if decoded and decoded.get("data", {}).get("username"):
+                    user_shortname = decoded["data"]["username"]
         except Exception:
             # Handle token received in the cookie
             auth_token = request.cookies.get("auth_token")
             if auth_token:
-                decoded = decode_jwt(auth_token)
-                if decoded and "username" in decoded and decoded["username"]:
-                    user_shortname = decoded["username"]
+                decoded = await decode_jwt(auth_token)
+                if decoded and decoded.get("data", {}).get("username"):
+                    user_shortname = decoded["data"]["username"]
         finally:
             if not user_shortname:
                 raise ApiException(
@@ -70,6 +75,15 @@ class JWTBearer(HTTPBearer):
                 )
 
         return user_shortname
+
+    async def extract_and_decode(cls, request) -> dict:
+        token = request.headers.get("Authorization") or request.cookies.get(
+            "auth_token"
+        )
+        token = token.split("Bearer ")[-1]
+        decoded = await decode_jwt(token)
+        decoded["token"] = token
+        return decoded
 
 
 class GetJWTToken(HTTPBearer):
@@ -87,6 +101,6 @@ class GetJWTToken(HTTPBearer):
             return request.cookies.get("auth_token")
 
 
-def sign_jwt(data: dict, expires: int = 86400) -> str:
+def sign_jwt(data: dict, expires: int = settings.access_token_expire) -> str:
     payload = {"data": data, "expires": time() + expires}
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)

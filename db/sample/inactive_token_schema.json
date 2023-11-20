@@ -1,0 +1,17 @@
+{
+    "title": "Acme User OTP",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+        "token": {
+            "type": "string"
+        },
+        "expires": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "token",
+        "expires"
+    ]
+}

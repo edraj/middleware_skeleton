@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     dmart_password: str = ""
     debug_enabled: bool = True
 
+    access_token_expire: int = 86400
 
     base_path: str = "/middleware"
 
@@ -48,14 +49,18 @@ class Settings(BaseSettings):
 
     facebook_client_id: str = ""
     facebook_client_secret: str = ""
-    
+
     github_client_id: str = ""
     github_client_secret: str = ""
-    
+
     microsoft_client_id: str = ""
     microsoft_client_secret: str = ""
 
-    model_config = SettingsConfigDict(env_file = os.getenv("BACKEND_ENV", "config.env"), env_file_encoding = "utf-8")
+    model_config = SettingsConfigDict(
+        env_file=os.getenv("BACKEND_ENV", "config.env"), env_file_encoding="utf-8"
+    )
+
+
 settings = Settings()
 # Uncomment this when you have a problem running the app to see if you have a problem with the env file
 # print(settings.model_dump_json())

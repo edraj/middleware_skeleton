@@ -133,9 +133,18 @@ class DMart:
             space_name, subpath, shortname, RequestType.create, attributes
         )
 
-    async def read(self, space_name: Space, subpath: str, shortname: str) -> dict:
+    async def read(
+        self,
+        space_name: Space,
+        subpath: str,
+        shortname: str,
+        retrieve_attachments: bool = False,
+    ) -> dict:
         return await self.__api(
-            f"/managed/entry/content/{space_name}/{subpath}/{shortname}",
+            (
+                f"/managed/entry/content/{space_name}/{subpath}/{shortname}"
+                f"?retrieve_json_payload=true&retrieve_attachments={retrieve_attachments}"
+            ),
             RequestMethod.get,
         )
 

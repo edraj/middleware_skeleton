@@ -42,11 +42,13 @@ from utils.settings import settings
 import socket
 import subprocess
 from api.auth.router import router as auth
+from api.user.router import router as user_routers
 
 service_start_time: str = ""
 version: str = "unknown"
 branch_name: str = "unknown"
 server_hostname: str = "unknown"
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -82,7 +84,7 @@ async def lifespan(app: FastAPI):
     print('{"stage":"shutting down"}')
 
 
-app = FastAPI (
+app = FastAPI(
     title="Dmart Middleware API",
     description="""A skeleton for Dmart middleware""",
     default_response_class=MainResponse,
@@ -92,8 +94,8 @@ app = FastAPI (
     docs_url=f"{settings.base_path}/docs",
     openapi_url=f"{settings.base_path}/openapi.json",
     servers=[{"url": f"{settings.base_path}/"}],
-    lifespan=lifespan
 )
+
 
 async def capture_body(request: Request):
     request.state.request_body = {}
@@ -289,6 +291,10 @@ app.add_middleware(
 
 app.include_router(
     auth, prefix="/auth", tags=["auth"], dependencies=[Depends(capture_body)]
+)
+
+app.include_router(
+    user_routers, prefix="/user", tags=["user"], dependencies=[Depends(capture_body)]
 )
 
 

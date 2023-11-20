@@ -1,4 +1,5 @@
 from typing import TypeVar
+from fastapi.logger import logger
 from pydantic import BaseModel, Field
 
 from models.enums import Schema, Space
@@ -10,6 +11,7 @@ from utils import regex
 model_data_mapper: dict = {
     "user": {"subpath": "users", "schema": Schema.user},
     "user_otp": {"subpath": "users_otps", "schema": Schema.user_otp},
+    "inactive_token": {"subpath": "inactive_tokens", "schema": Schema.inactive_token},
 }
 
 
@@ -64,13 +66,27 @@ class JsonModel(BaseModel):
         )
 
     @classmethod
+    def payload_to_model(cls, body: dict, shortname: str) -> TJsonModel | None:
+        try:
+            class_model = cls(**body)
+            class_model.shortname = shortname
+        except Exception as e:
+            logger.warn("Failed payload_to_model", extra={"data": body, "error": e})
+            return None
+        return class_model
+
+    @classmethod
     async def get(cls: type[TJsonModel], shortname: str) -> TJsonModel | None:
         model_name = snake_case(cls.__name__)
         try:
-            await dmart.read(
+            data: dict = await dmart.read(
                 space_name=Space.acme,
                 subpath=model_data_mapper[model_name]["subpath"],
                 shortname=shortname,
+            )
+            return cls.payload_to_model(
+                body=data.get("payload", {}).get("body"),
+                shortname=data.get("shortname")
             )
         except Exception as _:
             return None
@@ -87,6 +103,7 @@ class JsonModel(BaseModel):
         if not result.get("records"):
             return None
 
-        class_model = cls(**result["records"][0]["attributes"]["payload"]["body"])
-        class_model.shortname = result["records"][0]["shortname"]
-        return class_model
+        return cls.payload_to_model(
+            body=result["records"][0]["attributes"]["payload"]["body"],
+            shortname=result["records"][0]["shortname"],
+        )

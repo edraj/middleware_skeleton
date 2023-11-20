@@ -11,30 +11,30 @@ from uuid import uuid4
     2- copy management space from sample to ../../spaces/management
     3- create `acme` space
     4- create `schema` folder under `acme` space
-    5- create `user` and `user_otp` schemas under `schema` folder
-    6- create `users` and `users_otps` folders under `acme` space
+    5- create `user`, `user_otp`, and `inactive_token` schemas under `schema` folder
+    6- create `users`, `users_otps`, and `inactive_tokens` folders under `acme` space
 """
 
 
-def create_json_entry_meta(path: str, shortname: str, schema_shortname: str):
+def create_json_entry_meta(
+    path: str, shortname: str, schema_shortname: str, has_payload: bool = True
+):
     entry_meta = open(path, "w")
-    entry_meta.write(
-        json.dumps(
-            {
-                "uuid": str(uuid4()),
-                "shortname": shortname,
-                "is_active": True,
-                "tags": [],
-                "created_at": str(datetime.now()),
-                "owner_shortname": "dmart",
-                "payload": {
-                    "content_type": "json",
-                    "schema_shortname": schema_shortname,
-                    "body": f"{shortname}.json",
-                },
-            }
-        )
-    )
+    data = {
+        "uuid": str(uuid4()),
+        "shortname": shortname,
+        "is_active": True,
+        "tags": [],
+        "created_at": str(datetime.now()),
+        "owner_shortname": "dmart",
+    }
+    if has_payload:
+        data["payload"] = {
+            "content_type": "json",
+            "schema_shortname": schema_shortname,
+            "body": f"{shortname}.json",
+        }
+    entry_meta.write(json.dumps(data))
     entry_meta.close()
 
 
@@ -110,6 +110,18 @@ if __name__ == "__main__":
         data_file_path="sample/user_otp_schema.json",
     )
 
+    # create `inactive_token` schema under schema folder
+    os.makedirs("../../spaces/acme/schema/.dm/inactive_token")
+    create_json_entry_meta(
+        path="../../spaces/acme/schema/.dm/inactive_token/meta.schema.json",
+        shortname="inactive_token",
+        schema_shortname="meta_schema",
+    )
+    create_json_entry_payload(
+        path="../../spaces/acme/schema/inactive_token.json",
+        data_file_path="sample/inactive_token_schema.json",
+    )
+
     # create `users` folder
     os.makedirs("../../spaces/acme/users/.dm")
     create_json_entry_meta(
@@ -132,4 +144,13 @@ if __name__ == "__main__":
     create_json_entry_payload(
         path="../../spaces/acme/users_otps.json",
         data_file_path="sample/users_otps_folder.json",
+    )
+
+    # create `inactive_tokens` folders
+    os.makedirs("../../spaces/acme/inactive_tokens/.dm")
+    create_json_entry_meta(
+        path="../../spaces/acme/inactive_tokens/.dm/meta.folder.json",
+        shortname="inactive_tokens",
+        schema_shortname="folder_rendering",
+        has_payload=False
     )

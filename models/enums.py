@@ -10,6 +10,7 @@ class Schema(StrEnum):
     sample_product = "sample_product"
     user = "user"
     user_otp = "user_otp"
+    inactive_token = "inactive_token"
 
 
 class Space(StrEnum):
