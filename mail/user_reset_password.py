@@ -15,7 +15,10 @@ class UserResetPassword:
             body=html,
             subtype=MessageType.html,
         )
-
+        logger.info(
+            "UserResetPassword",
+            extra={"props": {"email": email, "otp": otp}},
+        )
         try:
             await mailer.send_message(message)
         except Exception as e:

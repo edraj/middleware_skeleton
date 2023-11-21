@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     dmart_username: str = ""
     dmart_password: str = ""
     debug_enabled: bool = True
-
+    logger_password_hash_key: str = b"ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg="
     access_token_expire: int = 86400
 
     base_path: str = "/middleware"

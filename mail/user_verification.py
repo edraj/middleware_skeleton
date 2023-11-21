@@ -15,10 +15,14 @@ class UserVerification:
             body=html,
             subtype=MessageType.html,
         )
+        logger.info(
+            "UserVerification",
+            extra={"props": {"email": email, "otp": otp}},
+        )
         try:
             await mailer.send_message(message)
         except Exception as e:
             logger.error(
                 "UserVerification",
-                extra={"props": {"email": email, "response": e.args}},
+                extra={"props": {"email": email, "error": e.args}},
             )
