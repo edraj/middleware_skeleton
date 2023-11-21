@@ -15,6 +15,23 @@ class RegisterRequest(BaseModel):
     os: OperatingSystems | None = None
     language: Language | None = None
 
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "first_name": "John",
+                    "last_name": "Doo",
+                    "phone": "7999228903",
+                    "email": "myname@gmail.com",
+                    "password": "test1234",
+                    "password_confirmation": "test1234",
+                    "profile_pic_url": "https://pics.com/myname.png",
+                    "language": "en",
+                }
+            ]
+        }
+    }
+
     @field_validator("password")
     @classmethod
     def password_confirmed(cls, v: str, info: ValidationInfo) -> str:

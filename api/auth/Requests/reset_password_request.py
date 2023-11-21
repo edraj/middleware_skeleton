@@ -9,6 +9,20 @@ class ResetPasswordRequest(BaseModel):
     password: str = Field(pattern=regex.PASSWORD)
     otp: str
 
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "phone": "7999228903",
+                    "email": "myname@gmail.com",
+                    "password": "test1234",
+                    "password_confirmation": "test1234",
+                    "otp": "123456",
+                }
+            ]
+        }
+    }
+
     @field_validator("password")
     @classmethod
     def password_confirmed(cls, v: str, info: ValidationInfo) -> str:

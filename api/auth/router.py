@@ -1,5 +1,6 @@
 import random
-from fastapi import APIRouter, Depends, Request
+from typing import Annotated
+from fastapi import APIRouter, Depends, Query, Request
 from api.auth.Requests.login_request import LoginRequest
 from api.auth.Requests.register_request import RegisterRequest
 from api.auth.Requests.reset_password_request import ResetPasswordRequest
@@ -46,7 +47,10 @@ async def register(request: RegisterRequest):
 
 
 @router.post("/verify-email", response_model_exclude_none=True)
-async def verify_email(email: str, otp: str):
+async def verify_email(
+    email: Annotated[str, Query(example="myname@email.com")],
+    otp: Annotated[str, Query(example="123456")],
+):
     user: User | None = await User.find(f"@full_email:{{{escape_for_redis(email)}}}")
 
     if not user:
@@ -73,7 +77,10 @@ async def verify_email(email: str, otp: str):
 
 
 @router.post("/verify-phone", response_model_exclude_none=True)
-async def verify_phone(phone: str, otp: str):
+async def verify_phone(
+    phone: Annotated[str, Query(example="7999228903")],
+    otp: Annotated[str, Query(example="123456")],
+):
     user: User | None = await User.find(f"@phone:{phone}")
 
     if not user:
@@ -100,7 +107,9 @@ async def verify_phone(phone: str, otp: str):
 
 
 @router.get("/resend-verification-email", response_model_exclude_none=True)
-async def resend_verification_email(email: str):
+async def resend_verification_email(
+    email: Annotated[str, Query(example="myname@email.com")]
+):
     user: User | None = await User.find(f"@full_email:{{{escape_for_redis(email)}}}")
 
     if not user or user.is_email_verified:
@@ -129,7 +138,7 @@ async def resend_verification_email(email: str):
 
 
 @router.get("/resend-verification-sms", response_model_exclude_none=True)
-async def resend_verification_sms(phone: str):
+async def resend_verification_sms(phone: Annotated[str, Query(example="7999228903")]):
     user: User | None = await User.find(f"@phone:{phone}")
 
     if not user or user.is_phone_verified:
