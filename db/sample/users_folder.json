@@ -13,8 +13,8 @@
             "name": "Email"
         },
         {
-            "key": "phone",
-            "name": "Phone"
+            "key": "mobile",
+            "name": "mobile"
         }
     ],
     "unique_fields": [
@@ -22,7 +22,7 @@
             "payload.body.email"
         ],
         [
-            "payload.body.phone"
+            "payload.body.mobile"
         ]
     ],
     "allow_create": true,

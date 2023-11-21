@@ -4,7 +4,7 @@ from utils import regex
 
 class ResetPasswordRequest(BaseModel):
     email: str = Field(default=None, pattern=regex.EMAIL)
-    phone: str = Field(default=None, pattern=regex.MSISDN)
+    mobile: str = Field(default=None, pattern=regex.MSISDN)
     password_confirmation: str = Field(pattern=regex.PASSWORD)
     password: str = Field(pattern=regex.PASSWORD)
     otp: str
@@ -13,7 +13,7 @@ class ResetPasswordRequest(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
-                    "phone": "7999228903",
+                    "mobile": "7999228903",
                     "email": "myname@gmail.com",
                     "password": "test1234",
                     "password_confirmation": "test1234",

@@ -19,11 +19,11 @@ class UserCreatedListener:
 
         await UserVerificationMail.send(self.user.email, mail_otp.otp)
 
-        phone_otp = UserOtp(
+        mobile_otp = UserOtp(
             user_shortname=self.user.shortname,
-            otp_for=OTPFor.phone_verification,
+            otp_for=OTPFor.mobile_verification,
             otp=f"{random.randint(111111, 999999)}",
         )
-        await phone_otp.store()
+        await mobile_otp.store()
 
-        await SMSSender.send(self.user.phone, phone_otp.otp)
+        await SMSSender.send(self.user.mobile, mobile_otp.otp)

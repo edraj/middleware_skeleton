@@ -7,7 +7,7 @@ class RegisterRequest(BaseModel):
     first_name: str = Field(pattern=regex.NAME)
     last_name: str = Field(pattern=regex.NAME)
     email: str = Field(pattern=regex.EMAIL)
-    phone: str = Field(pattern=regex.MSISDN)
+    mobile: str = Field(pattern=regex.MSISDN)
     password_confirmation: str = Field(pattern=regex.PASSWORD)
     password: str = Field(pattern=regex.PASSWORD)
     profile_pic_url: str = Field(default=None, pattern=regex.URL)
@@ -21,7 +21,7 @@ class RegisterRequest(BaseModel):
                 {
                     "first_name": "John",
                     "last_name": "Doo",
-                    "phone": "7999228903",
+                    "mobile": "7999228903",
                     "email": "myname@gmail.com",
                     "password": "test1234",
                     "password_confirmation": "test1234",

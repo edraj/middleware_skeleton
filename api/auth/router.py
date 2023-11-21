@@ -76,12 +76,12 @@ async def verify_email(
     return ApiResponse(status=Status.success, message="Email verified successfully")
 
 
-@router.post("/verify-phone", response_model_exclude_none=True)
-async def verify_phone(
-    phone: Annotated[str, Query(example="7999228903")],
+@router.post("/verify-mobile", response_model_exclude_none=True)
+async def verify_mobile(
+    mobile: Annotated[str, Query(example="7999228903")],
     otp: Annotated[str, Query(example="123456")],
 ):
-    user: User | None = await User.find(f"@phone:{phone}")
+    user: User | None = await User.find(f"@mobile:{mobile}")
 
     if not user:
         raise ApiException(
@@ -90,7 +90,7 @@ async def verify_phone(
         )
 
     user_otp: UserOtp | None = await UserOtp.find(
-        f"@user_shortname:{user.shortname} @otp_for:{OTPFor.phone_verification}"
+        f"@user_shortname:{user.shortname} @otp_for:{OTPFor.mobile_verification}"
     )
 
     if not user_otp or user_otp.otp != otp:
@@ -99,11 +99,11 @@ async def verify_phone(
             error=Error(type="Invalid request", code=400, message="Invalid OTP"),
         )
 
-    user.is_phone_verified = True
+    user.is_mobile_verified = True
     await user.sync()
     await user_otp.delete()
 
-    return ApiResponse(status=Status.success, message="Phone verified successfully")
+    return ApiResponse(status=Status.success, message="mobile verified successfully")
 
 
 @router.get("/resend-verification-email", response_model_exclude_none=True)
@@ -138,10 +138,10 @@ async def resend_verification_email(
 
 
 @router.get("/resend-verification-sms", response_model_exclude_none=True)
-async def resend_verification_sms(phone: Annotated[str, Query(example="7999228903")]):
-    user: User | None = await User.find(f"@phone:{phone}")
+async def resend_verification_sms(mobile: Annotated[str, Query(example="7999228903")]):
+    user: User | None = await User.find(f"@mobile:{mobile}")
 
-    if not user or user.is_phone_verified:
+    if not user or user.is_mobile_verified:
         raise ApiException(
             status_code=404,
             error=Error(
@@ -150,42 +150,42 @@ async def resend_verification_sms(phone: Annotated[str, Query(example="799922890
         )
 
     user_otp: UserOtp | None = await UserOtp.find(
-        f"@user_shortname:{user.shortname} @otp_for:{OTPFor.phone_verification}"
+        f"@user_shortname:{user.shortname} @otp_for:{OTPFor.mobile_verification}"
     )
 
     if not user_otp:
         user_otp = UserOtp(
             user_shortname=user.shortname,
-            otp_for=OTPFor.phone_verification,
+            otp_for=OTPFor.mobile_verification,
             otp=f"{random.randint(111111, 999999)}",
         )
         await user_otp.store()
 
-    await SMSSender.send(user.phone, user_otp.otp)
+    await SMSSender.send(user.mobile, user_otp.otp)
 
     return ApiResponse(status=Status.success, message="SMS sent successfully")
 
 
 @router.post("/login", response_model_exclude_none=True)
 async def login(request: LoginRequest):
-    if not request.email and not request.phone:
+    if not request.email and not request.mobile:
         raise ApiException(
             status_code=401,
             error=Error(
-                type="auth", code=14, message="Please provide email or phone number"
+                type="auth", code=14, message="Please provide email or mobile number"
             ),
         )
     user: User | None = await User.find(
         f"@full_email:{{{escape_for_redis(request.email)}}}"
         if request.email
-        else f"@phone:{request.phone}"
+        else f"@mobile:{request.mobile}"
     )
 
     if (
         not user
         or (
             (request.email and not user.is_email_verified)
-            or (request.phone and not user.is_phone_verified)
+            or (request.mobile and not user.is_mobile_verified)
         )
         or not verify_password(request.password, user.password)
     ):
@@ -207,17 +207,17 @@ async def login(request: LoginRequest):
 
 
 @router.get("/forgot-password", response_model_exclude_none=True)
-async def forgot_password(email: str | None = None, phone: str | None = None):
-    if not email and not phone:
+async def forgot_password(email: str | None = None, mobile: str | None = None):
+    if not email and not mobile:
         raise ApiException(
             status_code=401,
             error=Error(
-                type="auth", code=14, message="Please provide email or phone number"
+                type="auth", code=14, message="Please provide email or mobile number"
             ),
         )
 
     user: User | None = await User.find(
-        f"@full_email:{{{escape_for_redis(email)}}}" if email else f"@phone:{phone}"
+        f"@full_email:{{{escape_for_redis(email)}}}" if email else f"@mobile:{mobile}"
     )
 
     if not user:
@@ -242,7 +242,7 @@ async def forgot_password(email: str | None = None, phone: str | None = None):
         await UserResetPassword.send(user.email, user_otp.otp)
         message = "Email sent successfully"
     else:
-        await SMSSender.send(user.phone, user_otp.otp)
+        await SMSSender.send(user.mobile, user_otp.otp)
         message = "SMS sent successfully"
 
     return ApiResponse(status=Status.success, message=message)
@@ -250,18 +250,18 @@ async def forgot_password(email: str | None = None, phone: str | None = None):
 
 @router.post("/reset-password", response_model_exclude_none=True)
 async def reset_password(request: ResetPasswordRequest):
-    if not request.email and not request.phone:
+    if not request.email and not request.mobile:
         raise ApiException(
             status_code=401,
             error=Error(
-                type="auth", code=14, message="Please provide email or phone number"
+                type="auth", code=14, message="Please provide email or mobile number"
             ),
         )
 
     user: User | None = await User.find(
         f"@full_email:{{{escape_for_redis(request.email)}}}"
         if request.email
-        else f"@phone:{request.phone}"
+        else f"@mobile:{request.mobile}"
     )
 
     if not user:

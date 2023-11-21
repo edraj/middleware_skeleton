@@ -10,7 +10,7 @@
             "type": "string",
             "enum": [
                 "mail_verification",
-                "phone_verification",
+                "mobile_verification",
                 "reset_password"
             ]
         },

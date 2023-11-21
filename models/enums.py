@@ -35,5 +35,5 @@ class Language(StrEnum):
 
 class OTPFor(StrEnum):
     mail_verification = "mail_verification"
-    phone_verification = "phone_verification"
+    mobile_verification = "mobile_verification"
     reset_password = "reset_password"

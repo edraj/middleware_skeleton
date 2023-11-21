@@ -12,8 +12,8 @@
             "description": "Last name",
             "type": "string"
         },
-        "phone": {
-            "description": "Phone number",
+        "mobile": {
+            "description": "mobile number",
             "type": "string"
         },
         "email": {
@@ -58,9 +58,9 @@
             "title": "Is email verified",
             "default": false
         },
-        "is_phone_verified": {
+        "is_mobile_verified": {
             "type": "boolean",
-            "title": "Is phone verified",
+            "title": "Is mobile verified",
             "default": false
         },
         "google_id": {

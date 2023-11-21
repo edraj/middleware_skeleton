@@ -11,14 +11,14 @@ class User(JsonModel):
     last_name: str = Field(pattern=regex.NAME)
     email: str = Field(pattern=regex.EMAIL)
     full_email: list[str] | None = None
-    phone: str = Field(default=None, pattern=regex.MSISDN)
+    mobile: str = Field(default=None, pattern=regex.MSISDN)
     password: str | None = None
     profile_pic_url: str = Field(default=None, pattern=regex.URL)
     firebase_token: str | None = None
     os: OperatingSystems | None = None
     language: Language | None = None
     is_email_verified: bool = False
-    is_phone_verified: bool = False
+    is_mobile_verified: bool = False
     google_id: str | None = None
     facebook_id: str | None = None
     twitter_id: str | None = None
