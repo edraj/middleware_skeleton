@@ -441,11 +441,8 @@ async def microsoft_callback(
 
 
 @router.post("/logout")
-async def logout(
-    request: Request,
-):
-    decoded_data = await JWTBearer().extract_and_decode(request)
-    user: User | None = await User.get(decoded_data.get("data", {}).get("username"))
+async def logout(request: Request, shortname=Depends(JWTBearer())):
+    user: User | None = await User.get(shortname)
 
     if not user:
         raise ApiException(
@@ -457,6 +454,7 @@ async def logout(
         user.firebase_token = None
         user.sync()
 
+    decoded_data = await JWTBearer().extract_and_decode(request)
     inactive_token = InactiveToken(
         token=decoded_data.get("token"), expires=str(decoded_data.get("expires"))
     )
