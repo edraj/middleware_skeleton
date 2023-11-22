@@ -39,10 +39,7 @@ async def register(request: RegisterRequest):
     return ApiResponse(
         status=Status.success,
         message="Account created successfully, please check your mail for the verification code",
-        data=user_model.model_dump(
-            exclude=["password", "password_confirmation", "full_email"],
-            exclude_none=True,
-        ),
+        data=user_model.represent(),
     )
 
 

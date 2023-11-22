@@ -1,5 +1,6 @@
 from pydantic import Field
 from events.user_created import UserCreatedEvent
+from events.user_updated import UserUpdatedEvent
 from models.enums import Language, OperatingSystems
 from models.json_model import JsonModel
 from utils import regex
@@ -24,7 +25,6 @@ class User(JsonModel):
     twitter_id: str | None = None
     github_id: str | None = None
     microsoft_id: str | None = None
-    
 
     async def store(self, trigger_events: bool = True):
         self.password = hash_password(self.password)
@@ -34,6 +34,12 @@ class User(JsonModel):
 
         if trigger_events:
             await UserCreatedEvent(self).trigger()
+
+    async def sync(self, updated: list = [], trigger_events=True) -> None:
+        await JsonModel.sync(self)
+
+        if trigger_events:
+            await UserUpdatedEvent(self, updated).trigger()
 
     def represent(self) -> dict:
         return self.model_dump(
