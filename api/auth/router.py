@@ -1,6 +1,6 @@
 import random
 from typing import Annotated
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Body, Depends, Query, Request
 from api.auth.Requests.login_request import LoginRequest
 from api.auth.Requests.register_request import RegisterRequest
 from api.auth.Requests.reset_password_request import ResetPasswordRequest
@@ -45,8 +45,8 @@ async def register(request: RegisterRequest):
 
 @router.post("/verify-email", response_model_exclude_none=True)
 async def verify_email(
-    email: Annotated[str, Query(example="myname@email.com")],
-    otp: Annotated[str, Query(example="123456")],
+    email: Annotated[str, Body(examples=["myname@email.com"])],
+    otp: Annotated[str, Body(examples=["123456"])],
 ):
     user: User | None = await User.find(f"@full_email:{{{escape_for_redis(email)}}}")
 
@@ -81,8 +81,8 @@ async def verify_email(
 
 @router.post("/verify-mobile", response_model_exclude_none=True)
 async def verify_mobile(
-    mobile: Annotated[str, Query(example="7999228903")],
-    otp: Annotated[str, Query(example="123456")],
+    mobile: Annotated[str, Body(examples=["7999228903"])],
+    otp: Annotated[str, Body(examples=["123456"])],
 ):
     user: User | None = await User.find(f"@mobile:{mobile}")
 
