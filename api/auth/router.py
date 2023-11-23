@@ -55,6 +55,12 @@ async def verify_email(
             status_code=404,
             error=Error(type="db", code=12, message="User not found"),
         )
+        
+    if user.is_email_verified:
+        raise ApiException(
+            status_code=400,
+            error=Error(type="db", code=12, message="User's email has already been verified, please go to login"),
+        )
 
     user_otp: UserOtp | None = await UserOtp.find(
         f"@user_shortname:{user.shortname} @otp_for:{OTPFor.mail_verification}"
@@ -84,6 +90,12 @@ async def verify_mobile(
         raise ApiException(
             status_code=404,
             error=Error(type="db", code=12, message="User not found"),
+        )
+        
+    if user.is_mobile_verified:
+        raise ApiException(
+            status_code=400,
+            error=Error(type="db", code=12, message="User's mobile has already been verified, please go to login"),
         )
 
     user_otp: UserOtp | None = await UserOtp.find(
