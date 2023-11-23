@@ -1,6 +1,8 @@
 #!/usr/bin/env -S BACKEND_ENV=config.env python3
 """ FastApi Main module """
 
+from api.number.router import numberRouter
+from api.delivery.router import deliveryRouter
 import asyncio
 import json
 import sys
@@ -43,6 +45,7 @@ import socket
 import subprocess
 from api.auth.router import router as auth
 from api.user.router import router as user_routers
+from api.votes.router import router as votes_router
 
 service_start_time: str = ""
 version: str = "unknown"
@@ -298,6 +301,13 @@ app.include_router(
     user_routers, prefix="/user", tags=["user"], dependencies=[Depends(capture_body)]
 )
 
+app.include_router(numberRouter, prefix="/number", tags=["number"],
+                   dependencies=[Depends(capture_body)])
+
+app.include_router(deliveryRouter, prefix="/delivery", tags=["delivery"],
+                   dependencies=[Depends(capture_body)])
+app.include_router(votes_router, prefix="/votes", tags=["votes"],
+                   dependencies=[Depends(capture_body)])
 
 @app.options("/{x:path}", include_in_schema=False)
 async def myoptions():

@@ -17,3 +17,4 @@ cryptography
 asgi_correlation_id
 fastapi-mail
 fastapi-sso
+redis

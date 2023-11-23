@@ -8,7 +8,7 @@ EMAIL = (
 )
 MSISDN = "^[1-9][0-9]{9}$"  # Exactly 10 digits, not starting with zero
 URL = "^https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\\b(?:[-a-zA-Z0-9()@:%_\+.~#?&\/=]*)$"
-
+AVAILABLE_NUMBER_CHECK = "^\d{1,6}$"
 # SUBPATH = "^[a-zA-Z\u0621-\u064A0-9\u0660-\u0669_/]{1,128}$"
 # FILENAME = re.compile(
 #     "^[a-zA-Z\u0621-\u064A0-9\u0660-\u0669_]{1,32}\\.(gif|png|jpeg|jpg|pdf|wsq|mp3|mp4)$"

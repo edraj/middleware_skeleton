@@ -11,6 +11,8 @@ class RegisterRequest(BaseModel):
     password_confirmation: str = Field(pattern=regex.PASSWORD)
     password: str = Field(pattern=regex.PASSWORD)
     profile_pic_url: str = Field(default=None, pattern=regex.URL)
+    promo_code:str =Field(default=None)
+    friend_invitation:str =Field(default=None)
     firebase_token: str | None = None
     os: OperatingSystems | None = None
     language: Language | None = None
@@ -26,6 +28,8 @@ class RegisterRequest(BaseModel):
                     "password": "test1234",
                     "password_confirmation": "test1234",
                     "profile_pic_url": "https://pics.com/myname.png",
+                    "friend_invitation":"xff4fdkfisjsk",
+                    "promo_code":"j42l343kj4",
                     "language": "en",
                 }
             ]
