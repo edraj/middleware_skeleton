@@ -9,7 +9,7 @@ class StrEnum(str, Enum):
 class Schema(StrEnum):
     sample_product = "sample_product"
     user = "user"
-    user_otp = "user_otp"
+    otp = "otp"
     inactive_token = "inactive_token"
 
 

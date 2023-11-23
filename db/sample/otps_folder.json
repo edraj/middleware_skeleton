@@ -1,7 +1,7 @@
 {
     "shortname_title": "Users OTPs",
     "content_schema_shortnames": [
-        "user_otp"
+        "otp"
     ],
     "index_attributes": [
         {

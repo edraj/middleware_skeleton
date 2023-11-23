@@ -11,8 +11,8 @@ from uuid import uuid4
     2- copy management space from sample to ../../spaces/management
     3- create `acme` space
     4- create `schema` folder under `acme` space
-    5- create `user`, `user_otp`, and `inactive_token` schemas under `schema` folder
-    6- create `users`, `users_otps`, and `inactive_tokens` folders under `acme` space
+    5- create `user`, `otp`, and `inactive_token` schemas under `schema` folder
+    6- create `users`, `otps`, and `inactive_tokens` folders under `acme` space
 """
 
 
@@ -98,16 +98,16 @@ if __name__ == "__main__":
         data_file_path="sample/user_schema.json",
     )
 
-    # create `user_otp` schema under schema folder
-    os.makedirs("../../spaces/acme/schema/.dm/user_otp")
+    # create `otp` schema under schema folder
+    os.makedirs("../../spaces/acme/schema/.dm/otp")
     create_json_entry_meta(
-        path="../../spaces/acme/schema/.dm/user_otp/meta.schema.json",
-        shortname="user_otp",
+        path="../../spaces/acme/schema/.dm/otp/meta.schema.json",
+        shortname="otp",
         schema_shortname="meta_schema",
     )
     create_json_entry_payload(
-        path="../../spaces/acme/schema/user_otp.json",
-        data_file_path="sample/user_otp_schema.json",
+        path="../../spaces/acme/schema/otp.json",
+        data_file_path="sample/otp_schema.json",
     )
 
     # create `inactive_token` schema under schema folder
@@ -134,16 +134,16 @@ if __name__ == "__main__":
         data_file_path="sample/users_folder.json",
     )
 
-    # create `users_otps` folders
-    os.makedirs("../../spaces/acme/users_otps/.dm")
+    # create `otps` folders
+    os.makedirs("../../spaces/acme/otps/.dm")
     create_json_entry_meta(
-        path="../../spaces/acme/users_otps/.dm/meta.folder.json",
-        shortname="users_otps",
+        path="../../spaces/acme/otps/.dm/meta.folder.json",
+        shortname="otps",
         schema_shortname="folder_rendering",
     )
     create_json_entry_payload(
-        path="../../spaces/acme/users_otps.json",
-        data_file_path="sample/users_otps_folder.json",
+        path="../../spaces/acme/otps.json",
+        data_file_path="sample/otps_folder.json",
     )
 
     # create `inactive_tokens` folders

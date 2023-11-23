@@ -10,7 +10,7 @@ from utils import regex
 
 model_data_mapper: dict = {
     "user": {"subpath": "users", "schema": Schema.user},
-    "user_otp": {"subpath": "users_otps", "schema": Schema.user_otp},
+    "otp": {"subpath": "otps", "schema": Schema.otp},
     "inactive_token": {"subpath": "inactive_tokens", "schema": Schema.inactive_token},
 }
 

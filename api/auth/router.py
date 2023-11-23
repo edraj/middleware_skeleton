@@ -15,7 +15,7 @@ from mail.user_reset_password import UserResetPassword
 from mail.user_verification import UserVerification
 from models.user import User
 from models.enums import OTPFor, Status
-from models.user_otp import UserOtp
+from models.otp import Otp
 from utils.helpers import escape_for_redis
 from utils.jwt import JWTBearer, sign_jwt
 from utils.password_hashing import hash_password, verify_password
@@ -62,11 +62,11 @@ async def verify_email(
             error=Error(type="db", code=12, message="User's email has already been verified, please go to login"),
         )
 
-    user_otp: UserOtp | None = await UserOtp.find(
+    otp_model: Otp | None = await Otp.find(
         f"@user_shortname:{user.shortname} @otp_for:{OTPFor.mail_verification}"
     )
-
-    if not user_otp or user_otp.otp != otp:
+ 
+    if not otp_model or otp_model.otp != otp:
         return ApiResponse(
             status=Status.failed,
             error=Error(type="Invalid request", code=400, message="Invalid OTP"),
@@ -74,7 +74,7 @@ async def verify_email(
 
     user.is_email_verified = True
     await user.sync()
-    await user_otp.delete()
+    await otp_model.delete()
 
     return ApiResponse(status=Status.success, message="Email verified successfully")
 
@@ -98,11 +98,11 @@ async def verify_mobile(
             error=Error(type="db", code=12, message="User's mobile has already been verified, please go to login"),
         )
 
-    user_otp: UserOtp | None = await UserOtp.find(
+    otp_model: Otp | None = await Otp.find(
         f"@user_shortname:{user.shortname} @otp_for:{OTPFor.mobile_verification}"
     )
 
-    if not user_otp or user_otp.otp != otp:
+    if not otp_model or otp_model.otp != otp:
         return ApiResponse(
             status=Status.failed,
             error=Error(type="Invalid request", code=400, message="Invalid OTP"),
@@ -110,7 +110,7 @@ async def verify_mobile(
 
     user.is_mobile_verified = True
     await user.sync()
-    await user_otp.delete()
+    await otp_model.delete()
 
     return ApiResponse(status=Status.success, message="mobile verified successfully")
 
@@ -129,19 +129,19 @@ async def resend_verification_email(
             ),
         )
 
-    user_otp: UserOtp | None = await UserOtp.find(
+    otp: Otp | None = await Otp.find(
         f"@user_shortname:{user.shortname} @otp_for:{OTPFor.mail_verification}"
     )
 
-    if not user_otp:
-        user_otp = UserOtp(
+    if not otp:
+        otp = Otp(
             user_shortname=user.shortname,
             otp_for=OTPFor.mail_verification,
             otp=f"{random.randint(111111, 999999)}",
         )
-        await user_otp.store()
+        await otp.store()
 
-    await UserVerification.send(user.email, user_otp.otp)
+    await UserVerification.send(user.email, otp.otp)
 
     return ApiResponse(status=Status.success, message="Email sent successfully")
 
@@ -158,19 +158,19 @@ async def resend_verification_sms(mobile: Annotated[str, Query(example="79992289
             ),
         )
 
-    user_otp: UserOtp | None = await UserOtp.find(
+    otp: Otp | None = await Otp.find(
         f"@user_shortname:{user.shortname} @otp_for:{OTPFor.mobile_verification}"
     )
 
-    if not user_otp:
-        user_otp = UserOtp(
+    if not otp:
+        otp = Otp(
             user_shortname=user.shortname,
             otp_for=OTPFor.mobile_verification,
             otp=f"{random.randint(111111, 999999)}",
         )
-        await user_otp.store()
+        await otp.store()
 
-    await SMSSender.send(user.mobile, user_otp.otp)
+    await SMSSender.send(user.mobile, otp.otp)
 
     return ApiResponse(status=Status.success, message="SMS sent successfully")
 
@@ -235,23 +235,23 @@ async def forgot_password(email: str | None = None, mobile: str | None = None):
             error=Error(type="db", code=12, message="User not found"),
         )
 
-    user_otp: UserOtp | None = await UserOtp.find(
+    otp: Otp | None = await Otp.find(
         f"@user_shortname:{user.shortname} @otp_for:{OTPFor.reset_password}"
     )
 
-    if not user_otp:
-        user_otp = UserOtp(
+    if not otp:
+        otp = Otp(
             user_shortname=user.shortname,
             otp_for=OTPFor.reset_password,
             otp=f"{random.randint(111111, 999999)}",
         )
-        await user_otp.store()
+        await otp.store()
 
     if email:
-        await UserResetPassword.send(user.email, user_otp.otp)
+        await UserResetPassword.send(user.email, otp.otp)
         message = "Email sent successfully"
     else:
-        await SMSSender.send(user.mobile, user_otp.otp)
+        await SMSSender.send(user.mobile, otp.otp)
         message = "SMS sent successfully"
 
     return ApiResponse(status=Status.success, message=message)
@@ -279,11 +279,11 @@ async def reset_password(request: ResetPasswordRequest):
             error=Error(type="db", code=12, message="User not found"),
         )
 
-    user_otp: UserOtp | None = await UserOtp.find(
+    otp: Otp | None = await Otp.find(
         f"@user_shortname:{user.shortname} @otp_for:{OTPFor.reset_password}"
     )
 
-    if not user_otp or user_otp.otp != request.otp:
+    if not otp or otp.otp != request.otp:
         return ApiResponse(
             status=Status.failed,
             error=Error(type="Invalid request", code=400, message="Invalid OTP"),
@@ -291,7 +291,7 @@ async def reset_password(request: ResetPasswordRequest):
 
     user.password = hash_password(request.password)
     await user.sync()
-    await user_otp.delete()
+    await otp.delete()
 
     return ApiResponse(status=Status.success, message="Password updated successfully")
 
