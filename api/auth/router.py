@@ -55,21 +55,23 @@ async def verify_email(
             status_code=404,
             error=Error(type="db", code=12, message="User not found"),
         )
-        
+
     if user.is_email_verified:
         raise ApiException(
             status_code=400,
-            error=Error(type="db", code=12, message="User's email has already been verified, please go to login"),
+            error=Error(
+                type="db", code=18, message="User's email has already been verified, please go to login"),
         )
 
     otp_model: Otp | None = await Otp.find(
         f"@user_shortname:{user.shortname} @otp_for:{OTPFor.mail_verification}"
     )
- 
+
     if not otp_model or otp_model.otp != otp:
         return ApiResponse(
             status=Status.failed,
-            error=Error(type="Invalid request", code=400, message="Invalid OTP"),
+            error=Error(type="Invalid request",
+                        code=307, message="Invalid OTP"),
         )
 
     user.is_email_verified = True
@@ -91,11 +93,12 @@ async def verify_mobile(
             status_code=404,
             error=Error(type="db", code=12, message="User not found"),
         )
-        
+
     if user.is_mobile_verified:
         raise ApiException(
             status_code=400,
-            error=Error(type="db", code=12, message="User's mobile has already been verified, please go to login"),
+            error=Error(
+                type="db", code=25, message="User's mobile has already been verified, please go to login"),
         )
 
     otp_model: Otp | None = await Otp.find(
@@ -105,7 +108,8 @@ async def verify_mobile(
     if not otp_model or otp_model.otp != otp:
         return ApiResponse(
             status=Status.failed,
-            error=Error(type="Invalid request", code=400, message="Invalid OTP"),
+            error=Error(type="Invalid request",
+                        code=307, message="Invalid OTP"),
         )
 
     user.is_mobile_verified = True
@@ -181,7 +185,7 @@ async def login(request: LoginRequest):
         raise ApiException(
             status_code=401,
             error=Error(
-                type="auth", code=14, message="Please provide email or mobile number"
+                type="auth", code=135, message="Please provide email or mobile number"
             ),
         )
     user: User | None = await User.find(
@@ -200,10 +204,12 @@ async def login(request: LoginRequest):
     ):
         raise ApiException(
             status_code=401,
-            error=Error(type="auth", code=14, message="Invalid Credentials"),
+            error=Error(type="auth", code=14,
+                        message="Invalid username or password"),
         )
 
-    access_token = sign_jwt({"username": user.shortname}, settings.jwt_access_expires)
+    access_token = sign_jwt({"username": user.shortname},
+                            settings.jwt_access_expires)
 
     return ApiResponse(
         status=Status.success,
@@ -221,7 +227,7 @@ async def forgot_password(email: str | None = None, mobile: str | None = None):
         raise ApiException(
             status_code=401,
             error=Error(
-                type="auth", code=14, message="Please provide email or mobile number"
+                type="auth", code=135, message="Please provide email or mobile number"
             ),
         )
 
@@ -263,7 +269,7 @@ async def reset_password(request: ResetPasswordRequest):
         raise ApiException(
             status_code=401,
             error=Error(
-                type="auth", code=14, message="Please provide email or mobile number"
+                type="auth", code=135, message="Please provide email or mobile number"
             ),
         )
 
@@ -286,7 +292,8 @@ async def reset_password(request: ResetPasswordRequest):
     if not otp or otp.otp != request.otp:
         return ApiResponse(
             status=Status.failed,
-            error=Error(type="Invalid request", code=400, message="Invalid OTP"),
+            error=Error(type="Invalid request",
+                        code=307, message="Invalid OTP"),
         )
 
     user.password = hash_password(request.password)

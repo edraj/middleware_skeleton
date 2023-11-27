@@ -15,7 +15,7 @@ async def decode_jwt(token: str) -> dict[str, Any]:
     if inactive:
         raise ApiException(
             status.HTTP_401_UNAUTHORIZED,
-            Error(type="jwtauth", code=12, message="Invalid Token [1]"),
+            Error(type="jwtauth", code=27, message="Invalid Token [1]"),
         )
 
     decoded_token: dict
@@ -26,7 +26,7 @@ async def decode_jwt(token: str) -> dict[str, Any]:
     except Exception:
         raise ApiException(
             status.HTTP_401_UNAUTHORIZED,
-            Error(type="jwtauth", code=12, message="Invalid Token [2]"),
+            Error(type="jwtauth", code=27, message="Invalid Token [2]"),
         )
     if (
         not decoded_token
@@ -35,12 +35,12 @@ async def decode_jwt(token: str) -> dict[str, Any]:
     ):
         raise ApiException(
             status.HTTP_401_UNAUTHORIZED,
-            Error(type="jwtauth", code=12, message="Invalid Token [3]"),
+            Error(type="jwtauth", code=27, message="Invalid Token [3]"),
         )
     if decoded_token["expires"] <= time():
         raise ApiException(
             status.HTTP_401_UNAUTHORIZED,
-            Error(type="jwtauth", code=13, message="Expired Token"),
+            Error(type="jwtauth", code=28, message="Expired Token"),
         )
 
     return decoded_token
@@ -72,7 +72,8 @@ class JWTBearer(HTTPBearer):
             if not user_shortname:
                 raise ApiException(
                     status.HTTP_401_UNAUTHORIZED,
-                    Error(type="jwtauth", code=13, message="Not authenticated [1]"),
+                    Error(type="jwtauth", code=13,
+                          message="Not authenticated [1]"),
                 )
 
         return user_shortname
