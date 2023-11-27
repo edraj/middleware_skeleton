@@ -1,12 +1,23 @@
-from models.json_model import JsonModel
-from utils.helpers import escape_for_redis
+from models.redis_model import RedisModel
+from datetime import datetime
+from utils.settings import settings
 
 
-class InactiveToken(JsonModel):
+class InactiveToken(RedisModel):
     token: str
-    expires: str
+    expires: str | None = None
 
-    async def store(self):
-        self.token = escape_for_redis(self.token)
+    def get_key(self) -> str:
+        return self.token
 
-        await JsonModel.store(self)
+    def get_expiry(self) -> int:
+        if self.expires:
+            seconds = int(
+                (
+                    datetime.fromtimestamp(float(self.expires)) - datetime.now()
+                ).total_seconds()
+            )
+        else:
+            seconds = settings.access_token_expire
+        
+        return seconds

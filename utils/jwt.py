@@ -5,14 +5,14 @@ from fastapi import Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from api.schemas.response import ApiException, Error
 from models.inactive_token import InactiveToken
-from utils.helpers import escape_for_redis
 
 from utils.settings import settings
 
 
 async def decode_jwt(token: str) -> dict[str, Any]:
-    inactive = await InactiveToken.find(f"@token:{escape_for_redis(token)}")
-    if inactive:
+    inactive = InactiveToken(token=token)
+    inactive_exists = await inactive.get()
+    if inactive_exists:
         raise ApiException(
             status.HTTP_401_UNAUTHORIZED,
             Error(type="jwtauth", code=12, message="Invalid Token [1]"),
