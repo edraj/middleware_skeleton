@@ -18,12 +18,16 @@ class Settings(BaseSettings):
     listening_host: str = "0.0.0.0"
     listening_port: int = 8081
     is_debug_enabled: bool = True
+    redis_host: str = "127.0.0.1"
+    redis_password: str = ""
+    redis_port: int = 6379
     dmart_url: str = "http://localhost:8282"
     dmart_username: str = ""
     dmart_password: str = ""
     debug_enabled: bool = True
     logger_password_hash_key: str = b"ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg="
     access_token_expire: int = 86400
+    otp_expire: int = 300 # seconds
 
     base_path: str = "/middleware"
 

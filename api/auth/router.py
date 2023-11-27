@@ -61,12 +61,15 @@ async def verify_email(
             status_code=400,
             error=Error(type="db", code=12, message="User's email has already been verified, please go to login"),
         )
-
-    otp_model: Otp | None = await Otp.find(
-        f"@user_shortname:{user.shortname} @otp_for:{OTPFor.mail_verification}"
+    
+    otp_model = Otp(
+        user_shortname=user.shortname,
+        otp=otp,
+        otp_for=OTPFor.mail_verification
     )
+    otp_exists = await otp_model.get_and_del()
  
-    if not otp_model or otp_model.otp != otp:
+    if not otp_exists:
         return ApiResponse(
             status=Status.failed,
             error=Error(type="Invalid request", code=400, message="Invalid OTP"),
@@ -74,7 +77,6 @@ async def verify_email(
 
     user.is_email_verified = True
     await user.sync()
-    await otp_model.delete()
 
     return ApiResponse(status=Status.success, message="Email verified successfully")
 
@@ -98,11 +100,14 @@ async def verify_mobile(
             error=Error(type="db", code=12, message="User's mobile has already been verified, please go to login"),
         )
 
-    otp_model: Otp | None = await Otp.find(
-        f"@user_shortname:{user.shortname} @otp_for:{OTPFor.mobile_verification}"
+    otp_model = Otp(
+        user_shortname=user.shortname,
+        otp=otp,
+        otp_for=OTPFor.mobile_verification
     )
-
-    if not otp_model or otp_model.otp != otp:
+    otp_exists = await otp_model.get_and_del()
+ 
+    if not otp_exists:
         return ApiResponse(
             status=Status.failed,
             error=Error(type="Invalid request", code=400, message="Invalid OTP"),
@@ -110,7 +115,6 @@ async def verify_mobile(
 
     user.is_mobile_verified = True
     await user.sync()
-    await otp_model.delete()
 
     return ApiResponse(status=Status.success, message="mobile verified successfully")
 
