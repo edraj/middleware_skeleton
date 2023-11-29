@@ -229,17 +229,12 @@ async def forgot_password(email: str | None = None, mobile: str | None = None):
             error=Error(type="db", code=12, message="User not found"),
         )
 
-    otp: Otp | None = await Otp.find(
-        f"@user_shortname:{user.shortname} @otp_for:{OTPFor.reset_password}"
+    otp = Otp(
+        user_shortname=user.shortname,
+        otp_for=OTPFor.reset_password,
+        otp=f"{random.randint(111111, 999999)}",
     )
-
-    if not otp:
-        otp = Otp(
-            user_shortname=user.shortname,
-            otp_for=OTPFor.reset_password,
-            otp=f"{random.randint(111111, 999999)}",
-        )
-        await otp.store()
+    await otp.store()
 
     if email:
         await UserResetPassword.send(user.email, otp.otp)
@@ -273,11 +268,14 @@ async def reset_password(request: ResetPasswordRequest):
             error=Error(type="db", code=12, message="User not found"),
         )
 
-    otp: Otp | None = await Otp.find(
-        f"@user_shortname:{user.shortname} @otp_for:{OTPFor.reset_password}"
+    otp_model = Otp(
+        user_shortname=user.shortname,
+        otp=request.otp,
+        otp_for=OTPFor.reset_password
     )
-
-    if not otp or otp.otp != request.otp:
+    otp_exists = await otp_model.get_and_del()
+ 
+    if not otp_exists:
         return ApiResponse(
             status=Status.failed,
             error=Error(type="Invalid request", code=400, message="Invalid OTP"),
@@ -285,7 +283,6 @@ async def reset_password(request: ResetPasswordRequest):
 
     user.password = hash_password(request.password)
     await user.sync()
-    await otp.delete()
 
     return ApiResponse(status=Status.success, message="Password updated successfully")
 
