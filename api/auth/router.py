@@ -132,18 +132,13 @@ async def resend_verification_email(
                 type="db", code=12, message="User not found or already verified"
             ),
         )
-
-    otp: Otp | None = await Otp.find(
-        f"@user_shortname:{user.shortname} @otp_for:{OTPFor.mail_verification}"
+        
+    otp = Otp(
+        user_shortname=user.shortname,
+        otp_for=OTPFor.mail_verification,
+        otp=f"{random.randint(111111, 999999)}",
     )
-
-    if not otp:
-        otp = Otp(
-            user_shortname=user.shortname,
-            otp_for=OTPFor.mail_verification,
-            otp=f"{random.randint(111111, 999999)}",
-        )
-        await otp.store()
+    await otp.store()
 
     await UserVerification.send(user.email, otp.otp)
 
@@ -162,17 +157,12 @@ async def resend_verification_sms(mobile: Annotated[str, Query(example="79992289
             ),
         )
 
-    otp: Otp | None = await Otp.find(
-        f"@user_shortname:{user.shortname} @otp_for:{OTPFor.mobile_verification}"
+    otp = Otp(
+        user_shortname=user.shortname,
+        otp_for=OTPFor.mobile_verification,
+        otp=f"{random.randint(111111, 999999)}",
     )
-
-    if not otp:
-        otp = Otp(
-            user_shortname=user.shortname,
-            otp_for=OTPFor.mobile_verification,
-            otp=f"{random.randint(111111, 999999)}",
-        )
-        await otp.store()
+    await otp.store()
 
     await SMSSender.send(user.mobile, otp.otp)
 
