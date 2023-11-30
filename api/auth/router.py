@@ -55,20 +55,22 @@ async def verify_email(
             status_code=404,
             error=Error(type="db", code=12, message="User not found"),
         )
-        
+
     if user.is_email_verified:
         raise ApiException(
             status_code=400,
-            error=Error(type="db", code=12, message="User's email has already been verified, please go to login"),
+            error=Error(
+                type="db",
+                code=12,
+                message="User's email has already been verified, please go to login",
+            ),
         )
-    
+
     otp_model = Otp(
-        user_shortname=user.shortname,
-        otp=otp,
-        otp_for=OTPFor.mail_verification
+        user_shortname=user.shortname, otp=otp, otp_for=OTPFor.mail_verification
     )
     otp_exists = await otp_model.get_and_del()
- 
+
     if not otp_exists:
         return ApiResponse(
             status=Status.failed,
@@ -93,20 +95,22 @@ async def verify_mobile(
             status_code=404,
             error=Error(type="db", code=12, message="User not found"),
         )
-        
+
     if user.is_mobile_verified:
         raise ApiException(
             status_code=400,
-            error=Error(type="db", code=12, message="User's mobile has already been verified, please go to login"),
+            error=Error(
+                type="db",
+                code=12,
+                message="User's mobile has already been verified, please go to login",
+            ),
         )
 
     otp_model = Otp(
-        user_shortname=user.shortname,
-        otp=otp,
-        otp_for=OTPFor.mobile_verification
+        user_shortname=user.shortname, otp=otp, otp_for=OTPFor.mobile_verification
     )
     otp_exists = await otp_model.get_and_del()
- 
+
     if not otp_exists:
         return ApiResponse(
             status=Status.failed,
@@ -121,7 +125,7 @@ async def verify_mobile(
 
 @router.get("/resend-verification-email", response_model_exclude_none=True)
 async def resend_verification_email(
-    email: Annotated[str, Query(example="myname@email.com")]
+    email: Annotated[str, Query(examples=["myname@email.com"])]
 ):
     user: User | None = await User.find(f"@full_email:{{{escape_for_redis(email)}}}")
 
@@ -132,7 +136,7 @@ async def resend_verification_email(
                 type="db", code=12, message="User not found or already verified"
             ),
         )
-        
+
     otp = Otp(
         user_shortname=user.shortname,
         otp_for=OTPFor.mail_verification,
@@ -146,7 +150,9 @@ async def resend_verification_email(
 
 
 @router.get("/resend-verification-sms", response_model_exclude_none=True)
-async def resend_verification_sms(mobile: Annotated[str, Query(example="7999228903")]):
+async def resend_verification_sms(
+    mobile: Annotated[str, Query(examples=["7999228903"])]
+):
     user: User | None = await User.find(f"@mobile:{mobile}")
 
     if not user or user.is_mobile_verified:
@@ -269,12 +275,10 @@ async def reset_password(request: ResetPasswordRequest):
         )
 
     otp_model = Otp(
-        user_shortname=user.shortname,
-        otp=request.otp,
-        otp_for=OTPFor.reset_password
+        user_shortname=user.shortname, otp=request.otp, otp_for=OTPFor.reset_password
     )
     otp_exists = await otp_model.get_and_del()
- 
+
     if not otp_exists:
         return ApiResponse(
             status=Status.failed,

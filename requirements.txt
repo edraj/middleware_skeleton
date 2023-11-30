@@ -10,6 +10,7 @@ hypercorn
 aiohttp
 passlib[bcrypt]
 pytest
+pytest-mock
 pytest-asyncio
 requests
 cryptography

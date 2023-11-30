@@ -1,4 +1,5 @@
 import asyncio
+from fastapi.logger import logger
 from redis.asyncio import BlockingConnectionPool, Redis
 from utils.settings import settings
 
@@ -12,8 +13,9 @@ class RedisServices(object):
         protocol=3,
         max_connections=20,
     )
-    
+
     is_pytest = False
+
     def __await__(self):
         return self.init().__await__()
 
@@ -53,8 +55,7 @@ class RedisServices(object):
         exc = exc
         tb = tb
         await self.client.aclose()
-        
-    
+
     async def get(self, key) -> str | None:
         value = await self.client.get(key)
         if isinstance(value, str):
@@ -71,3 +72,12 @@ class RedisServices(object):
 
     async def set(self, key, value, ex=None, nx: bool = False):
         return await self.client.set(key, value, ex=ex, nx=nx)
+
+    async def get_keys(self, pattern: str = "*") -> list:
+        try:
+            value = await self.client.keys(pattern)
+            if isinstance(value, list):
+                return value
+        except Exception as e:
+            logger.warning(f"Error at redis_services.get_keys: {e}")
+        return []
