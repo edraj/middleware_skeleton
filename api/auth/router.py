@@ -74,7 +74,7 @@ async def verify_email(
     if not otp_exists:
         return ApiResponse(
             status=Status.failed,
-            error=Error(type="Invalid request", code=400, message="Invalid OTP"),
+            error=Error(type="Invalid request", code=307, message="Invalid OTP"),
         )
 
     user.is_email_verified = True
@@ -114,7 +114,7 @@ async def verify_mobile(
     if not otp_exists:
         return ApiResponse(
             status=Status.failed,
-            error=Error(type="Invalid request", code=400, message="Invalid OTP"),
+            error=Error(type="Invalid request", code=307, message="Invalid OTP"),
         )
 
     user.is_mobile_verified = True
@@ -133,7 +133,7 @@ async def resend_verification_email(
         raise ApiException(
             status_code=404,
             error=Error(
-                type="db", code=12, message="User not found or already verified"
+                type="db", code=33, message="User not found or already verified"
             ),
         )
 
@@ -159,7 +159,7 @@ async def resend_verification_sms(
         raise ApiException(
             status_code=404,
             error=Error(
-                type="db", code=12, message="User not found or already verified"
+                type="db", code=33, message="User not found or already verified"
             ),
         )
 
@@ -282,7 +282,7 @@ async def reset_password(request: ResetPasswordRequest):
     if not otp_exists:
         return ApiResponse(
             status=Status.failed,
-            error=Error(type="Invalid request", code=400, message="Invalid OTP"),
+            error=Error(type="Invalid request", code=307, message="Invalid OTP"),
         )
 
     user.password = hash_password(request.password)
