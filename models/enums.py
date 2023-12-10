@@ -37,3 +37,14 @@ class OTPFor(StrEnum):
     mail_verification = "mail_verification"
     mobile_verification = "mobile_verification"
     reset_password = "reset_password"
+    
+
+class ResourceType(StrEnum):
+    folder = "folder"
+    schema = "schema"
+    content = "content"
+    comment = "comment"
+    media = "media"
+    ticket = "ticket"
+    json = "json"
+    lock = "lock"

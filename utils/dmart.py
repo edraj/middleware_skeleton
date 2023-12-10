@@ -1,5 +1,5 @@
 import aiohttp
-from models.enums import Space
+from models.enums import ResourceType, Space
 from utils.settings import settings
 from enum import Enum
 from typing import Any
@@ -104,6 +104,7 @@ class DMart:
         shortname,
         request_type: RequestType,
         attributes: dict[str, Any] = {},
+        resource_type: ResourceType = ResourceType.content,
     ) -> dict:
         return await self.__api(
             "/managed/request",
@@ -113,7 +114,7 @@ class DMart:
                 "request_type": request_type,
                 "records": [
                     {
-                        "resource_type": "content",
+                        "resource_type": resource_type,
                         "subpath": subpath,
                         "shortname": shortname,
                         "attributes": attributes,
