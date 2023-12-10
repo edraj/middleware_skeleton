@@ -1,8 +1,6 @@
 #!/usr/bin/env -S BACKEND_ENV=config.env python3
 """ FastApi Main module """
 
-from api.number.router import numberRouter
-from api.delivery.router import deliveryRouter
 import asyncio
 import json
 import sys
@@ -22,22 +20,11 @@ from urllib.parse import quote
 from utils.logger import logging_schema
 from pydantic import ValidationError
 from contextlib import asynccontextmanager
+from api.delivery.router import router as  deliveryRouter
 
-# from api.number.router import router as number
-# from api.number_v2.router import router as number_v2
-# from api.otp.router import router as otp
-# from api.schemas import examples as api_examples
-# from api.schemas.data import Error, Status
 from api.schemas.response import ApiException, ApiResponse, Error
 from models.enums import Status
 
-# from api.user.router import router as user
-# from api.user_v2.router import router as user_v2
-# from api.payment.router import router as payment
-# from api.notifications.router import router as notifications
-# from api.control.router import router as control
-# from api.referral.router import router as referral
-# from monkey_patchs import swagger_monkey_patch
 from utils.response import MainResponse
 from fastapi.logger import logger
 from utils.settings import settings
@@ -45,7 +32,6 @@ import socket
 import subprocess
 from api.auth.router import router as auth
 from api.user.router import router as user_routers
-from api.votes.router import router as votes_router
 
 service_start_time: str = ""
 version: str = "unknown"
@@ -301,12 +287,7 @@ app.include_router(
     user_routers, prefix="/user", tags=["user"], dependencies=[Depends(capture_body)]
 )
 
-app.include_router(numberRouter, prefix="/number", tags=["number"],
-                   dependencies=[Depends(capture_body)])
-
 app.include_router(deliveryRouter, prefix="/delivery", tags=["delivery"],
-                   dependencies=[Depends(capture_body)])
-app.include_router(votes_router, prefix="/votes", tags=["votes"],
                    dependencies=[Depends(capture_body)])
 
 @app.options("/{x:path}", include_in_schema=False)

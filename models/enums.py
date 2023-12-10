@@ -37,7 +37,6 @@ class OTPFor(StrEnum):
     mail_verification = "mail_verification"
     mobile_verification = "mobile_verification"
     reset_password = "reset_password"
-    
 
 class ResourceType(StrEnum):
     folder = "folder"
@@ -48,3 +47,19 @@ class ResourceType(StrEnum):
     ticket = "ticket"
     json = "json"
     lock = "lock"
+
+class CancellationReasons(StrEnum):
+        not_needed="not_needed"
+        ordered_by_mistake= "ordered_by_mistake"
+        changed_my_mind = "changed_my_mind"
+        change_order="change_order"
+
+class DeliverStatus(StrEnum):
+    cancelled="cancelled"
+    pending="pending"
+    confirmed="confirmed"
+    rejected="rejected"
+    assigned="assigned"
+    failed="failed"
+    delivered="delivered"
+>>>>>>> dced29e (complete delivery api)

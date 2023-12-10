@@ -184,13 +184,13 @@ class DMart:
             space_name, subpath, shortname, RequestType.update, attributes
         )
 
-    async def delete(self, space_name: Space, subpath, shortname) -> dict:
+    async def delete(self, space_name: Space, subpath, shortname, resource_type: ResourceType = ResourceType.content) -> dict:
         json = {
             "space_name": space_name,
             "request_type": RequestType.delete,
             "records": [
                 {
-                    "resource_type": "content",
+                    "resource_type": resource_type,
                     "subpath": subpath,
                     "shortname": shortname,
                     "attributes": {},
