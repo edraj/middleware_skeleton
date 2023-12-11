@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from api.schemas.response import ApiException, ApiResponse, Error
 from api.user.Requests.user_update_request import UserUpdateRequest
-from models.enums import Status
+from models.base.enums import Status
 from models.user import User
 from utils.jwt import JWTBearer
 

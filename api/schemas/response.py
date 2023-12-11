@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import Any
 from builtins import Exception as PyException
-from models.enums import Status
+from models.base.enums import Status
 
 
 class Error(BaseModel):

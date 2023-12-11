@@ -1,8 +1,8 @@
 from pydantic import Field
 from events.user_created import UserCreatedEvent
 from events.user_updated import UserUpdatedEvent
-from models.enums import Language, OperatingSystems
-from models.json_model import JsonModel
+from models.base.enums import Language, OperatingSystems
+from models.base.json_model import JsonModel
 from utils import regex
 from utils.password_hashing import hash_password
 

@@ -2,7 +2,7 @@ from typing import TypeVar
 from fastapi.logger import logger
 from pydantic import BaseModel, Field
 
-from models.enums import Schema, Space
+from models.base.enums import Schema, Space
 from utils.dmart import dmart
 from utils.helpers import snake_case
 from utils import regex

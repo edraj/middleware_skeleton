@@ -5,7 +5,7 @@ from fastapi.routing import APIRouter
 from api.delivery.requests.create_delivery_request import CreateDeliveryRequest
 from api.delivery.requests.update_delivery import UpdateDeliveryRequest
 from api.schemas.response import ApiException, ApiResponse, Error
-from models.enums import CancellationReasons, DeliverStatus, Language, Status
+from models.base.enums import CancellationReasons, DeliverStatus, Language, Status
 import requests
 import json
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer

@@ -1,5 +1,5 @@
 from pydantic import BaseModel,Field
-from models.enums import DeliverStatus, Language
+from models.base.enums import DeliverStatus, Language
 from utils import regex
 from datetime import datetime ,date
 class UpdateDeliveryRequest(BaseModel):

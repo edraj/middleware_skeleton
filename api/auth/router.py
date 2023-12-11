@@ -14,7 +14,7 @@ from services.sms_sender import SMSSender
 from mail.user_reset_password import UserResetPassword
 from mail.user_verification import UserVerification
 from models.user import User
-from models.enums import OTPFor, Status
+from models.base.enums import OTPFor, Status
 from models.otp import Otp
 from utils.helpers import escape_for_redis
 from utils.jwt import JWTBearer, sign_jwt

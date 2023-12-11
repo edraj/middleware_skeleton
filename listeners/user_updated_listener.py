@@ -1,7 +1,7 @@
 from services.sms_sender import SMSSender
 from mail.user_verification import UserVerification as UserVerificationMail
 import random
-from models.enums import OTPFor
+from models.base.enums import OTPFor
 from models.otp import Otp
 
 

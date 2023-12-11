@@ -1,5 +1,5 @@
 import aiohttp
-from models.enums import ResourceType, Space
+from models.base.enums import ResourceType, Space
 from utils.settings import settings
 from enum import Enum
 from typing import Any
