@@ -1,8 +1,10 @@
+from io import StringIO
+import json
 import aiohttp
-from models.base.enums import ResourceType, Space
+from models.base.enums import CancellationReason, ResourceType, Space
 from utils.settings import settings
 from enum import Enum
-from typing import Any
+from typing import Any, BinaryIO
 from fastapi import status
 from api.schemas.response import ApiException, Error
 
@@ -52,7 +54,9 @@ class DMart:
 
             self.auth_token = resp_json["records"][0]["attributes"]["access_token"]
 
-    async def __api(self, endpoint, method: RequestMethod, json=None) -> dict:
+    async def __api(
+        self, endpoint, method: RequestMethod, json=None, files: dict | None = None
+    ) -> dict:
         resp_json = {}
         response: aiohttp.ClientResponse | None = None
         for _ in range(3):
@@ -60,7 +64,7 @@ class DMart:
             try:
                 async with aiohttp.ClientSession() as session:
                     response = await getattr(session, method.value)(
-                        url, headers=self.get_headers(), json=json
+                        url, headers=self.get_headers(), json=json, data=files
                     )
                     # if json:
                     #     response = await session.post(
@@ -129,9 +133,32 @@ class DMart:
         subpath: str,
         attributes: dict,
         shortname: str = "auto",
+        resource_type: ResourceType = ResourceType.content,
     ) -> dict:
         return await self.__request(
-            space_name, subpath, shortname, RequestType.create, attributes
+            space_name,
+            subpath,
+            shortname,
+            RequestType.create,
+            attributes,
+            resource_type,
+        )
+
+    async def upload_resource_with_payload(
+        self, space_name: Space, record: dict, paylod: BinaryIO, payload_mime_type: str
+    ):
+        record_file = StringIO(json.dumps(record))
+
+        files = {
+            "request_record": ("record.json", record_file, "application/json"),
+            "payload_file": (paylod.name.split("/")[-1], paylod, payload_mime_type),
+        }
+
+        return await self.__api(
+            endpoint="managed/resource_with_payload",
+            method=RequestMethod.post,
+            files=files,
+            json={"space_name": space_name},
         )
 
     async def read(
@@ -140,10 +167,11 @@ class DMart:
         subpath: str,
         shortname: str,
         retrieve_attachments: bool = False,
+        resource_type: ResourceType = ResourceType.content,
     ) -> dict:
         return await self.__api(
             (
-                f"/managed/entry/content/{space_name}/{subpath}/{shortname}"
+                f"/managed/entry/{resource_type}/{space_name}/{subpath}/{shortname}"
                 f"?retrieve_json_payload=true&retrieve_attachments={retrieve_attachments}"
             ),
             RequestMethod.get,
@@ -178,13 +206,46 @@ class DMart:
         )
 
     async def update(
-        self, space_name: Space, subpath, shortname, attributes: dict
+        self,
+        space_name: Space,
+        subpath,
+        shortname,
+        attributes: dict,
+        resource_type: ResourceType = ResourceType.content,
     ) -> dict:
         return await self.__request(
-            space_name, subpath, shortname, RequestType.update, attributes
+            space_name,
+            subpath,
+            shortname,
+            RequestType.update,
+            attributes,
+            resource_type,
         )
 
-    async def delete(self, space_name: Space, subpath, shortname, resource_type: ResourceType = ResourceType.content) -> dict:
+    async def progress_ticket(
+        self,
+        space_name: Space,
+        subpath: str,
+        shortname: str,
+        action: str,
+        cancellation_reasons: CancellationReason | None = None,
+    ) -> dict:
+        request_body = None
+        if cancellation_reasons:
+            request_body = {"resolution": cancellation_reasons}
+        return await self.__api(
+            (f"/managed/progress-ticket/{space_name}/{subpath}/{shortname}/{action}"),
+            RequestMethod.put,
+            json=request_body,
+        )
+
+    async def delete(
+        self,
+        space_name: Space,
+        subpath,
+        shortname,
+        resource_type: ResourceType = ResourceType.content,
+    ) -> dict:
         json = {
             "space_name": space_name,
             "request_type": RequestType.delete,
