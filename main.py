@@ -23,7 +23,7 @@ from contextlib import asynccontextmanager
 from api.delivery.router import router as  deliveryRouter
 
 from api.schemas.response import ApiException, ApiResponse, Error
-from models.enums import Status
+from models.base.enums import Status
 
 from utils.response import MainResponse
 from fastapi.logger import logger

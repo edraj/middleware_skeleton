@@ -1,6 +1,6 @@
 from pydantic import Field
-from models.enums import OTPFor
-from models.redis_model import RedisModel
+from models.base.enums import OTPFor
+from models.base.redis_model import RedisModel
 from utils import regex
 from utils.settings import settings
 

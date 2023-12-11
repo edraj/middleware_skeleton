@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, ValidationInfo, field_validator
-from models.enums import Language, OperatingSystems
+from models.base.enums import Language, OperatingSystems
 from utils import regex
 
 
