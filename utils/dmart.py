@@ -129,9 +129,15 @@ class DMart:
         subpath: str,
         attributes: dict,
         shortname: str = "auto",
+        resource_type: ResourceType = ResourceType.content,
     ) -> dict:
         return await self.__request(
-            space_name, subpath, shortname, RequestType.create, attributes
+            space_name,
+            subpath,
+            shortname,
+            RequestType.create,
+            attributes,
+            resource_type,
         )
 
     async def read(
@@ -178,13 +184,29 @@ class DMart:
         )
 
     async def update(
-        self, space_name: Space, subpath, shortname, attributes: dict
+        self,
+        space_name: Space,
+        subpath,
+        shortname,
+        attributes: dict,
+        resource_type: ResourceType = ResourceType.content,
     ) -> dict:
         return await self.__request(
-            space_name, subpath, shortname, RequestType.update, attributes
+            space_name,
+            subpath,
+            shortname,
+            RequestType.update,
+            attributes,
+            resource_type,
         )
 
-    async def delete(self, space_name: Space, subpath, shortname, resource_type: ResourceType = ResourceType.content) -> dict:
+    async def delete(
+        self,
+        space_name: Space,
+        subpath,
+        shortname,
+        resource_type: ResourceType = ResourceType.content,
+    ) -> dict:
         json = {
             "space_name": space_name,
             "request_type": RequestType.delete,
