@@ -1,8 +1,8 @@
 from typing import Annotated
 from fastapi import Form, Depends, Path as PathParam
 from fastapi.routing import APIRouter
-from api.delivery.requests.create_delivery_request import CreateDeliveryRequest
-from api.delivery.requests.update_delivery import UpdateDeliveryRequest
+from api.order.requests.create_order_request import CreateOrderRequest
+from api.order.requests.update_order import UpdateOrderRequest
 from api.schemas.response import ApiResponse
 from models.base.enums import CancellationReason, DeliverStatus, Status
 from fastapi.security import HTTPBearer
@@ -19,7 +19,7 @@ security = HTTPBearer()
 
 
 @router.post("/create")
-async def create_delivery(request: CreateDeliveryRequest, _=Depends(JWTBearer())):
+async def create_order(request: CreateOrderRequest, _=Depends(JWTBearer())):
     order_model = Order(
         **request.model_dump(exclude=["password_confirmation"], exclude_none=True)
     )
@@ -33,8 +33,8 @@ async def create_delivery(request: CreateDeliveryRequest, _=Depends(JWTBearer())
     )
 
 
-@router.get("/track/{shortname}")
-async def track_delivery(
+@router.get("/{shortname}/track")
+async def track_order(
     shortname: Annotated[
         str, PathParam(examples=["b775fdbe"], description="Order shortname")
     ],
@@ -49,7 +49,7 @@ async def track_delivery(
     )
 
 
-@router.put("/cancel/{shortname}")
+@router.put("/{shortname}/cancel")
 async def cancel_order(
     shortname: Annotated[
         str, PathParam(examples=["b775fdbe"], description="Order shortname")
@@ -72,7 +72,7 @@ async def cancel_order(
     )
 
 
-@router.put("/assign/{shortname}")
+@router.put("/{shortname}/assign")
 async def assign_order(
     shortname: Annotated[
         str, PathParam(examples=["b775fdbe"], description="Order shortname")
@@ -90,9 +90,9 @@ async def assign_order(
     )
 
 
-@router.put("/update/{shortname}")
-async def update_delivery(
-    request: UpdateDeliveryRequest,
+@router.put("/{shortname}/update")
+async def update_order(
+    request: UpdateOrderRequest,
     shortname: Annotated[
         str, PathParam(examples=["f7bcb9fe"], description="Order shortname")
     ],
@@ -115,9 +115,9 @@ async def update_delivery(
 
 
 @router.post("/query")
-async def order_query(delivery_status: DeliverStatus, _=Depends(JWTBearer())):
+async def order_query(order_status: DeliverStatus, _=Depends(JWTBearer())):
     orders: list[Order] = await Order.search(
-        search=f"@state:{delivery_status}",
+        search=f"@state:{order_status}",
         filter_types=["ticket", "media"],
         retrieve_attachments=True,
     )
