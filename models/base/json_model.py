@@ -177,6 +177,7 @@ class JsonModel(BaseModel):
         models = []
 
         for record in result.get("records", []):
+            record["attributes"]["attachments"] = record["attachments"]
             models.append(
                 cls.payload_to_model(
                     attributes=record["attributes"],

@@ -50,7 +50,7 @@ class DMart:
             url = f"{settings.dmart_url}/user/login"
             response = await session.post(
                 url,
-                headers=self.get_headers(),
+                headers=self.json_headers,
                 json=json,
             )
             resp_json = await response.json()
