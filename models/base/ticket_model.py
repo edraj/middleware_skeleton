@@ -1,3 +1,4 @@
+from api.schemas.response import ApiException, Error
 from models.base.enums import CancellationReason, ResourceType, Space
 from models.base.json_model import JsonModel, TJsonModel, model_data_mapper
 from utils.dmart import dmart
@@ -33,6 +34,7 @@ class TicketModel(JsonModel):
                 subpath=model_data_mapper[model_name]["subpath"],
                 shortname=shortname,
                 resource_type=ResourceType.ticket,
+                retrieve_attachments=True,
             )
             return cls.payload_to_model(
                 attributes=data,
@@ -40,6 +42,16 @@ class TicketModel(JsonModel):
             )
         except Exception as _:
             return None
+
+    @classmethod
+    async def get_or_fail(cls: type[TJsonModel], shortname: str) -> TJsonModel | None:
+        model = await cls.get(shortname)
+        if not model:
+            raise ApiException(
+                status_code=404,
+                error=Error(type="db", code=12, message="Model not found"),
+            )
+        return model
 
     async def delete(self) -> None:
         await JsonModel.delete(self, ResourceType.ticket)

@@ -1,16 +1,12 @@
-import os
 from typing import Annotated
-from fastapi import Query, Depends, Path as PathParam
+from fastapi import Form, Depends, Path as PathParam
 from fastapi.routing import APIRouter
 from api.delivery.requests.create_delivery_request import CreateDeliveryRequest
 from api.delivery.requests.update_delivery import UpdateDeliveryRequest
-from api.schemas.response import ApiException, ApiResponse, Error
+from api.schemas.response import ApiResponse
 from models.base.enums import CancellationReason, DeliverStatus, Status
-import requests
-import json
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import HTTPBearer
 from fastapi import UploadFile
-from pathlib import Path
 from models.order import Order
 
 from utils.jwt import JWTBearer
@@ -44,13 +40,7 @@ async def track_delivery(
     ],
     _=Depends(JWTBearer()),
 ):
-    order: Order | None = await Order.get(shortname)
-
-    if not order:
-        raise ApiException(
-            status_code=404,
-            error=Error(type="db", code=12, message="Order not found"),
-        )
+    order: Order = await Order.get_or_fail(shortname)
 
     return ApiResponse(
         status=Status.success,
@@ -67,7 +57,7 @@ async def cancel_order(
     cancellation_reason: CancellationReason,
     _=Depends(JWTBearer()),
 ):
-    order: Order | None = await Order.get(shortname)
+    order: Order = await Order.get_or_fail(shortname)
 
     await order.progress("cancel", cancellation_reason)
 
@@ -89,7 +79,7 @@ async def assign_order(
     ],
     _=Depends(JWTBearer()),
 ):
-    order: Order | None = await Order.get(shortname)
+    order: Order = await Order.get_or_fail(shortname)
 
     await order.progress("assign")
 
@@ -108,7 +98,7 @@ async def update_delivery(
     ],
     _=Depends(JWTBearer()),
 ):
-    order: Order | None = await Order.get(shortname)
+    order: Order = await Order.get_or_fail(shortname)
 
     data = request.model_dump(exclude_none=True)
 
@@ -139,70 +129,30 @@ async def order_query(delivery_status: DeliverStatus, _=Depends(JWTBearer())):
     )
 
 
-@router.post("/attachments")
+@router.post("/{shortname}/attach")
 async def upload_attachment(
     file: UploadFile,
     shortname: Annotated[
-        str, Query(examples=["b775fdbe"], description="order shortname")
+        str, PathParam(examples=["b775fdbe"], description="order shortname")
     ],
     document_name: Annotated[
-        str, Query(examples=["front_citizin_id"], description="document name ")
+        str, Form(examples=["front_citizen_id"], description="document name")
     ],
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    _=Depends(JWTBearer()),
 ):
-    file.file
-    # json file path
-    token = credentials.credentials
-    uploaded_document = await get_file(file)
-    uploadAttachmentJson = await get_upload_attachment_json(document_name, shortname)
-    files = [
-        (
-            "payload_file",
-            (
-                "App Store Badge US Black.png",
-                open(uploaded_document, "rb"),
-                "image/png",
-            ),
-        ),
-        (
-            "request_record",
-            (
-                "uploadAttachmentJson.json",
-                open(uploadAttachmentJson, "rb"),
-                "application/json",
-            ),
-        ),
-    ]
+    order: Order = await Order.get_or_fail(shortname)
 
-    url = "https://api.oodi.iq/dmart/managed/resource_with_payload"
-    payload = {"space_name": "acme"}
-    headers = {"Cookie": f"auth_token={token}", "Authorization": f"Bearer {token}"}
-    response = requests.request("POST", url, headers=headers, data=payload, files=files)
-    os.remove(uploaded_document)
-    os.remove(uploadAttachmentJson)
-    return response.json()
+    attached = await order.attach(
+        payload=file.file,
+        payload_file_name=file.filename,
+        payload_mime_type=file.content_type,
+        entry_shortname=document_name,
+    )
 
-
-async def get_upload_attachment_json(document_name, shortname) -> str:
-    upload_dir = Path()
-    uploadAttachmentJson_path = "uploadAttachmentJson.json"
-    json_data = {
-        "attributes": {"is_active": True},
-        "resource_type": "media",
-        "shortname": document_name,
-        "subpath": f"orders/{shortname}",
-    }
-    temp_uploadAttachmentJson_dir = upload_dir / uploadAttachmentJson_path
-    # Serialize the JSON data and write it to the file
-    with open(temp_uploadAttachmentJson_dir, "w") as json_file:
-        json.dump(json_data, json_file)
-    return temp_uploadAttachmentJson_dir
-
-
-async def get_file(file) -> str:
-    upload_dir = Path()
-    data = await file.read()
-    temp_save = upload_dir / file.filename
-    with open(temp_save, "wb") as f:
-        f.write(data)
-    return temp_save
+    if attached:
+        return ApiResponse(status=Status.success, message="Media attached successfully")
+    else:
+        return ApiResponse(
+            status=Status.failed,
+            message="Failed to upload the attachment, please try again",
+        )

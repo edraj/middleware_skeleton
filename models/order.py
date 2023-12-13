@@ -22,6 +22,7 @@ class Order(TicketModel):
     workflow_shortname: str = "order"
     resolution_reason: str | None = None
     iccid: str = "8858774455555"
+    attachments: dict | None = None
 
     @classmethod
     def payload_body_attributes(self) -> list:
@@ -39,7 +40,7 @@ class Order(TicketModel):
 
     @classmethod
     def class_attributes(self) -> dict:
-        return ["state", "workflow_shortname"]
+        return ["state", "workflow_shortname", "attachments"]
 
     def represent(self) -> dict:
         return self.model_dump(

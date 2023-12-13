@@ -1,3 +1,5 @@
+from api.schemas.response import ApiException, Error
+from io import BytesIO
 from typing import TypeVar
 from fastapi.logger import logger
 from pydantic import BaseModel, Field
@@ -119,6 +121,7 @@ class JsonModel(BaseModel):
                 space_name=Space.acme,
                 subpath=model_data_mapper[model_name]["subpath"],
                 shortname=shortname,
+                retrieve_attachments=True,
             )
             return cls.payload_to_model(
                 attributes=data,
@@ -126,6 +129,16 @@ class JsonModel(BaseModel):
             )
         except Exception as _:
             return None
+
+    @classmethod
+    async def get_or_fail(cls: type[TJsonModel], shortname: str) -> TJsonModel | None:
+        model = await cls.get(shortname)
+        if not model:
+            raise ApiException(
+                status_code=404,
+                error=Error(type="db", code=12, message="Model not found"),
+            )
+        return model
 
     @classmethod
     async def find(cls: type[TJsonModel], search: str) -> TJsonModel | None:
@@ -172,3 +185,28 @@ class JsonModel(BaseModel):
             )
 
         return models
+
+    async def attach(
+        self,
+        payload: BytesIO,
+        payload_file_name: str,
+        payload_mime_type: str,
+        entry_shortname: str | None = None,
+    ) -> bool:
+        model_name = snake_case(self.__class__.__name__)
+        record = {
+            "resource_type": ResourceType.media,
+            "shortname": entry_shortname or "auto",
+            "subpath": f"{model_data_mapper[model_name]['subpath']}/{self.shortname}",
+            "attributes": {"is_active": True},
+        }
+        try:
+            await dmart.upload_resource_with_payload(
+                space_name=Space.acme,
+                record=record,
+                payload=payload,
+                payload_file_name=payload_file_name,
+                payload_mime_type=payload_mime_type,
+            )
+        except Exception:
+            return False
