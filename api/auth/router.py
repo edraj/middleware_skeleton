@@ -1,6 +1,6 @@
 import random
 from typing import Annotated
-from fastapi import APIRouter, Body, Depends, Query, Request
+from fastapi import APIRouter, Body, Depends, Query, Request, Response
 from api.auth.Requests.login_request import LoginRequest
 from api.auth.Requests.register_request import RegisterRequest
 from api.auth.Requests.reset_password_request import ResetPasswordRequest
@@ -176,7 +176,7 @@ async def resend_verification_sms(
 
 
 @router.post("/login", response_model_exclude_none=True)
-async def login(request: LoginRequest):
+async def login(response: Response, request: LoginRequest):
     if not request.email and not request.mobile:
         raise ApiException(
             status_code=401,
@@ -204,6 +204,15 @@ async def login(request: LoginRequest):
         )
 
     access_token = sign_jwt({"username": user.shortname}, settings.jwt_access_expires)
+
+    response.set_cookie(
+        value=access_token,
+        max_age=settings.jwt_access_expires,
+        key="auth_token",
+        httponly=True,
+        secure=True,
+        samesite="none",
+    )
 
     return ApiResponse(
         status=Status.success,
@@ -448,14 +457,8 @@ async def microsoft_callback(
 
 
 @router.post("/logout")
-async def logout(request: Request, shortname=Depends(JWTBearer())):
-    user: User | None = await User.get(shortname)
-
-    if not user:
-        raise ApiException(
-            status_code=404,
-            error=Error(type="db", code=12, message="User not found"),
-        )
+async def logout(response: Response, request: Request, shortname=Depends(JWTBearer())):
+    user: User | None = await User.get_or_fail(shortname)
 
     if user.firebase_token:
         user.firebase_token = None
@@ -466,5 +469,14 @@ async def logout(request: Request, shortname=Depends(JWTBearer())):
         token=decoded_data.get("token"), expires=str(decoded_data.get("expires"))
     )
     await inactive_token.store()
+
+    response.set_cookie(
+        value="",
+        max_age=0,
+        key="auth_token",
+        httponly=True,
+        secure=True,
+        samesite="none",
+    )
 
     return ApiResponse(status=Status.success, message="Logged out successfully")
