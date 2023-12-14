@@ -40,7 +40,7 @@ class Order(TicketModel):
 
     @classmethod
     def class_attributes(self) -> dict:
-        return ["state", "workflow_shortname", "attachments"]
+        return ["state", "workflow_shortname", "resolution_reason", "attachments"]
 
     def represent(self) -> dict:
         return self.model_dump(

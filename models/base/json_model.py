@@ -140,6 +140,24 @@ class JsonModel(BaseModel):
             )
         return model
 
+    async def refresh(self) -> None:
+        model_name = snake_case(self.__class__.__name__)
+        try:
+            data: dict = await dmart.read(
+                space_name=Space.acme,
+                subpath=model_data_mapper[model_name]["subpath"],
+                shortname=self.shortname,
+                retrieve_attachments=True,
+            )
+            updated = self.__class__.payload_to_model(
+                attributes=data,
+                shortname=data.get("shortname"),
+            )
+            for key, val in dict(updated).items():
+                setattr(self, key, val)
+        except Exception as e:
+            logger.warn(f"Failed to refresh the model: {model_name}", {"error": e.args})
+
     @classmethod
     async def find(cls: type[TJsonModel], search: str) -> TJsonModel | None:
         model_name = snake_case(cls.__name__)
@@ -209,5 +227,6 @@ class JsonModel(BaseModel):
                 payload_file_name=payload_file_name,
                 payload_mime_type=payload_mime_type,
             )
+            return True
         except Exception:
             return False

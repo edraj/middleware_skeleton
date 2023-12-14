@@ -60,6 +60,7 @@ async def cancel_order(
     order: Order = await Order.get_or_fail(shortname)
 
     await order.progress("cancel", cancellation_reason)
+    await order.refresh()
 
     order.resolution_reason = cancellation_reason
 
@@ -67,7 +68,7 @@ async def cancel_order(
 
     return ApiResponse(
         status=Status.success,
-        message="Order retrieved successfully",
+        message="Order cancelled successfully",
         data={"order": order.represent()},
     )
 
@@ -82,10 +83,11 @@ async def assign_order(
     order: Order = await Order.get_or_fail(shortname)
 
     await order.progress("assign")
+    await order.refresh()
 
     return ApiResponse(
         status=Status.success,
-        message="Order retrieved successfully",
+        message="Order assigned successfully",
         data={"order": order.represent()},
     )
 
