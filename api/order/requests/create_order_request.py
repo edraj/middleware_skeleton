@@ -4,7 +4,7 @@ from models.order import DeliverLocation
 from utils import regex
 
 
-class CreateDeliveryRequest(BaseModel):
+class CreateOrderRequest(BaseModel):
     name: str = Field(
         default=None,
         examples=["John"],

@@ -1,12 +1,13 @@
-from io import StringIO
+from io import BytesIO
 import json
 import aiohttp
 from models.base.enums import CancellationReason, ResourceType, Space
 from utils.settings import settings
 from enum import Enum
-from typing import Any, BinaryIO
+from typing import Any
 from fastapi import status
 from api.schemas.response import ApiException, Error
+from fastapi.logger import logger
 
 
 class RequestType(str, Enum):
@@ -27,9 +28,16 @@ class RequestMethod(str, Enum):
 class DMart:
     auth_token = ""
 
-    def get_headers(self):
+    @property
+    def json_headers(self):
         return {
             "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.auth_token}",
+        }
+
+    @property
+    def headers(self):
+        return {
             "Authorization": f"Bearer {self.auth_token}",
         }
 
@@ -42,7 +50,7 @@ class DMart:
             url = f"{settings.dmart_url}/user/login"
             response = await session.post(
                 url,
-                headers=self.get_headers(),
+                headers=self.json_headers,
                 json=json,
             )
             resp_json = await response.json()
@@ -55,37 +63,39 @@ class DMart:
             self.auth_token = resp_json["records"][0]["attributes"]["access_token"]
 
     async def __api(
-        self, endpoint, method: RequestMethod, json=None, files: dict | None = None
+        self,
+        endpoint,
+        method: RequestMethod,
+        json=None,
+        data=None,
     ) -> dict:
+        if not self.auth_token:
+            await self.login()
+
         resp_json = {}
         response: aiohttp.ClientResponse | None = None
-        for _ in range(3):
-            url = f"{settings.dmart_url}{endpoint}"
-            try:
-                async with aiohttp.ClientSession() as session:
-                    response = await getattr(session, method.value)(
-                        url, headers=self.get_headers(), json=json, data=files
-                    )
-                    # if json:
-                    #     response = await session.post(
-                    #         url, headers=self.get_headers(), json=json
-                    #     )
-                    # else:
-                    #     response = await session.get(url, headers=self.get_headers())
+        try:
+            async with aiohttp.ClientSession() as session:
+                response = await session.request(
+                    method.value,
+                    f"{settings.dmart_url}{endpoint}",
+                    headers=self.json_headers if json else self.headers,
+                    json=json if not data else None,
+                    data=data if data else None,
+                )
+                resp_json = await response.json()
 
-                    resp_json = await response.json()
-
-                if (
-                    resp_json
-                    and resp_json.get("status", None) == "failed"
-                    and resp_json.get("error", {}).get("type", None) == "jwtauth"
-                ):
-                    await self.login()
-                    raise ConnectionError()
-
-                break
-            except ConnectionError:
-                continue
+        except ConnectionError as e:
+            logger.warn(
+                "Failed request to Dmart core",
+                {
+                    "endpoint": endpoint,
+                    "method": method,
+                    "json": json,
+                    "data": data,
+                    "error": e.args,
+                },
+            )
 
         if response is None or response.status != 200:
             message = resp_json.get("error", {}).get("message", {})
@@ -145,20 +155,34 @@ class DMart:
         )
 
     async def upload_resource_with_payload(
-        self, space_name: Space, record: dict, paylod: BinaryIO, payload_mime_type: str
+        self,
+        space_name: Space,
+        record: dict,
+        payload: BytesIO,
+        payload_file_name: str,
+        payload_mime_type: str,
     ):
-        record_file = StringIO(json.dumps(record))
+        record_file = BytesIO(bytes(json.dumps(record), "utf-8"))
 
-        files = {
-            "request_record": ("record.json", record_file, "application/json"),
-            "payload_file": (paylod.name.split("/")[-1], paylod, payload_mime_type),
-        }
+        data = aiohttp.FormData()
+        data.add_field(
+            "request_record",
+            record_file,
+            filename="record.json",
+            content_type="application/json",
+        )
+        data.add_field(
+            "payload_file",
+            payload,
+            filename=payload_file_name,
+            content_type=payload_mime_type,
+        )
+        data.add_field("space_name", space_name)
 
         return await self.__api(
-            endpoint="managed/resource_with_payload",
+            endpoint="/managed/resource_with_payload",
             method=RequestMethod.post,
-            files=files,
-            json={"space_name": space_name},
+            data=data,
         )
 
     async def read(

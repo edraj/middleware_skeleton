@@ -1,3 +1,5 @@
+from api.schemas.response import ApiException, Error
+from io import BytesIO
 from typing import TypeVar
 from fastapi.logger import logger
 from pydantic import BaseModel, Field
@@ -119,6 +121,7 @@ class JsonModel(BaseModel):
                 space_name=Space.acme,
                 subpath=model_data_mapper[model_name]["subpath"],
                 shortname=shortname,
+                retrieve_attachments=True,
             )
             return cls.payload_to_model(
                 attributes=data,
@@ -126,6 +129,34 @@ class JsonModel(BaseModel):
             )
         except Exception as _:
             return None
+
+    @classmethod
+    async def get_or_fail(cls: type[TJsonModel], shortname: str) -> TJsonModel | None:
+        model = await cls.get(shortname)
+        if not model:
+            raise ApiException(
+                status_code=404,
+                error=Error(type="db", code=12, message="Model not found"),
+            )
+        return model
+
+    async def refresh(self) -> None:
+        model_name = snake_case(self.__class__.__name__)
+        try:
+            data: dict = await dmart.read(
+                space_name=Space.acme,
+                subpath=model_data_mapper[model_name]["subpath"],
+                shortname=self.shortname,
+                retrieve_attachments=True,
+            )
+            updated = self.__class__.payload_to_model(
+                attributes=data,
+                shortname=data.get("shortname"),
+            )
+            for key, val in dict(updated).items():
+                setattr(self, key, val)
+        except Exception as e:
+            logger.warn(f"Failed to refresh the model: {model_name}", {"error": e.args})
 
     @classmethod
     async def find(cls: type[TJsonModel], search: str) -> TJsonModel | None:
@@ -164,6 +195,7 @@ class JsonModel(BaseModel):
         models = []
 
         for record in result.get("records", []):
+            record["attributes"]["attachments"] = record["attachments"]
             models.append(
                 cls.payload_to_model(
                     attributes=record["attributes"],
@@ -172,3 +204,29 @@ class JsonModel(BaseModel):
             )
 
         return models
+
+    async def attach(
+        self,
+        payload: BytesIO,
+        payload_file_name: str,
+        payload_mime_type: str,
+        entry_shortname: str | None = None,
+    ) -> bool:
+        model_name = snake_case(self.__class__.__name__)
+        record = {
+            "resource_type": ResourceType.media,
+            "shortname": entry_shortname or "auto",
+            "subpath": f"{model_data_mapper[model_name]['subpath']}/{self.shortname}",
+            "attributes": {"is_active": True},
+        }
+        try:
+            await dmart.upload_resource_with_payload(
+                space_name=Space.acme,
+                record=record,
+                payload=payload,
+                payload_file_name=payload_file_name,
+                payload_mime_type=payload_mime_type,
+            )
+            return True
+        except Exception:
+            return False

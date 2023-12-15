@@ -3,7 +3,7 @@ from models.base.enums import DeliverStatus
 from datetime import datetime
 
 
-class UpdateDeliveryRequest(BaseModel):
+class UpdateOrderRequest(BaseModel):
     tracking_id: str = Field()
     planned_delivery_date: str = Field(default=None, examples=[datetime.now()])
     scheduled_delivery: str = Field(default=None, examples=[datetime.now()])
