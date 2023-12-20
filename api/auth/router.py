@@ -1,5 +1,6 @@
 import random
 from typing import Annotated
+import aiohttp
 from fastapi import APIRouter, Body, Depends, Query, Request, Response
 from api.auth.Requests.login_request import LoginRequest
 from api.auth.Requests.register_request import RegisterRequest
@@ -24,6 +25,7 @@ from fastapi_sso.sso.google import GoogleSSO
 from fastapi_sso.sso.facebook import FacebookSSO
 from fastapi_sso.sso.github import GithubSSO
 from fastapi_sso.sso.microsoft import MicrosoftSSO
+from fastapi_sso.sso.base import SSOBase
 
 router = APIRouter()
 
@@ -300,30 +302,12 @@ async def reset_password(request: ResetPasswordRequest):
     return ApiResponse(status=Status.success, message="Password updated successfully")
 
 
-@router.get("/google/login")
-async def google_login(google_sso: GoogleSSO = Depends(get_google_sso)):
-    return await google_sso.get_login_redirect()
-
-
-@router.get("/google/callback")
-async def google_callback(
-    request: Request, google_sso: GoogleSSO = Depends(get_google_sso)
+@router.post("/google/login")
+async def google_profile(
+    access_token: Annotated[str, Body()],
+    google_sso: GoogleSSO = Depends(get_google_sso),
 ):
-    user = await google_sso.verify_and_process(request)
-    user_model: User | None = await User.find(search=f"@google_id:{user.id}")
-
-    if not user_model:
-        user_model = User(
-            google_id=user.id,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            email=user.email,
-            is_email_verified=True,
-            profile_pic_url=user.picture,
-            password="GoogleAuthorized@dmart#2024",
-        )
-
-        await user_model.store(trigger_events=False)
+    user_model = await social_login(access_token, google_sso, "google")
 
     access_token = sign_jwt(
         {"username": user_model.shortname}, settings.jwt_access_expires
@@ -339,30 +323,12 @@ async def google_callback(
     )
 
 
-@router.get("/facebook/login")
-async def facebook_login(facebook_sso: FacebookSSO = Depends(get_facebook_sso)):
-    return await facebook_sso.get_login_redirect()
-
-
-@router.get("/facebook/callback")
-async def facebook_callback(
-    request: Request, facebook_sso: FacebookSSO = Depends(get_facebook_sso)
+@router.post("/facebook/login")
+async def facebook_login(
+    access_token: Annotated[str, Body()],
+    facebook_sso: FacebookSSO = Depends(get_facebook_sso),
 ):
-    user = await facebook_sso.verify_and_process(request)
-    user_model: User | None = await User.find(search=f"@facebook_id:{user.id}")
-
-    if not user_model:
-        user_model = User(
-            facebook_id=user.id,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            email=user.email,
-            is_email_verified=True,
-            profile_pic_url=user.picture,
-            password="FacebookAuthorized@dmart#2024",
-        )
-
-        await user_model.store(trigger_events=False)
+    user_model = await social_login(access_token, facebook_sso, "facebook")
 
     access_token = sign_jwt(
         {"username": user_model.shortname}, settings.jwt_access_expires
@@ -379,29 +345,11 @@ async def facebook_callback(
 
 
 @router.get("/github/login")
-async def github_login(github_sso: GithubSSO = Depends(get_github_sso)):
-    return await github_sso.get_login_redirect()
-
-
-@router.get("/github/callback")
-async def github_callback(
-    request: Request, github_sso: GithubSSO = Depends(get_github_sso)
+async def github_login(
+    access_token: Annotated[str, Body()],
+    github_sso: GithubSSO = Depends(get_github_sso),
 ):
-    user = await github_sso.verify_and_process(request)
-    user_model: User | None = await User.find(search=f"@github_id:{user.id}")
-
-    if not user_model:
-        user_model = User(
-            github_id=user.id,
-            first_name=user.display_name,
-            last_name="",
-            email=user.email,
-            is_email_verified=True,
-            profile_pic_url=user.picture,
-            password="GithubAuthorized@dmart#2024",
-        )
-
-        await user_model.store(trigger_events=False)
+    user_model = await social_login(access_token, github_sso, "github")
 
     access_token = sign_jwt(
         {"username": user_model.shortname}, settings.jwt_access_expires
@@ -418,29 +366,11 @@ async def github_callback(
 
 
 @router.get("/microsoft/login")
-async def microsoft_login(microsoft_sso: MicrosoftSSO = Depends(get_microsoft_sso)):
-    return await microsoft_sso.get_login_redirect()
-
-
-@router.get("/microsoft/callback")
-async def microsoft_callback(
-    request: Request, microsoft_sso: MicrosoftSSO = Depends(get_microsoft_sso)
+async def microsoft_login(
+    access_token: Annotated[str, Body()],
+    microsoft_sso: MicrosoftSSO = Depends(get_microsoft_sso),
 ):
-    user = await microsoft_sso.verify_and_process(request)
-    user_model: User | None = await User.find(search=f"@microsoft_id:{user.id}")
-
-    if not user_model:
-        user_model = User(
-            microsoft_id=user.id,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            email=user.email,
-            is_email_verified=True,
-            profile_pic_url=user.picture,
-            password="MicrosoftAuthorized@dmart#2024",
-        )
-
-        await user_model.store(trigger_events=False)
+    user_model = await social_login(access_token, microsoft_sso, "microsoft")
 
     access_token = sign_jwt(
         {"username": user_model.shortname}, settings.jwt_access_expires
@@ -454,6 +384,34 @@ async def microsoft_callback(
             "token": access_token,
         },
     )
+
+
+async def social_login(access_token: str, sso: SSOBase, provider: str):
+    async with aiohttp.ClientSession() as session:
+        user_profile_endpoint = await sso.userinfo_endpoint
+        response = await session.get(
+            user_profile_endpoint, headers={"Authorization": f"Bearer {access_token}"}
+        )
+        content = await response.json()
+        provider_user = await sso.openid_from_response(content)
+
+    user_model: User | None = await User.find(
+        search=f"@{provider}_id:{provider_user.id}"
+    )
+
+    if not user_model:
+        user_model = User(
+            first_name=provider_user.first_name,
+            last_name=provider_user.last_name,
+            email=provider_user.email,
+            is_email_verified=True,
+            profile_pic_url=provider_user.picture,
+        )
+        setattr(user_model, f"{provider}_id", provider_user.id)
+
+        await user_model.store(trigger_events=False)
+
+    return user_model
 
 
 @router.post("/logout")
