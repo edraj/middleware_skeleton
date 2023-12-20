@@ -392,6 +392,12 @@ async def social_login(access_token: str, sso: SSOBase, provider: str):
         response = await session.get(
             user_profile_endpoint, headers={"Authorization": f"Bearer {access_token}"}
         )
+        if response.status != 200:
+            raise ApiException(
+                status_code=400,
+                error=Error(type="data", code=12, message="Invalid access token"),
+            )
+
         content = await response.json()
         provider_user = await sso.openid_from_response(content)
 
