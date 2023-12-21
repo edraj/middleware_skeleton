@@ -2,6 +2,7 @@ import random
 from typing import Annotated
 import aiohttp
 from fastapi import APIRouter, Body, Depends, Query, Request, Response
+from api.auth.Requests.initial_registration_request import InitialRegistrationRequest
 from api.auth.Requests.login_request import LoginRequest
 from api.auth.Requests.register_request import RegisterRequest
 from api.auth.Requests.reset_password_request import ResetPasswordRequest
@@ -17,7 +18,7 @@ from mail.user_verification import UserVerification
 from models.user import User
 from models.base.enums import OTPFor, Status
 from models.otp import Otp
-from utils.helpers import escape_for_redis
+from utils.helpers import escape_for_redis, special_to_underscore
 from utils.jwt import JWTBearer, sign_jwt
 from utils.password_hashing import hash_password, verify_password
 from utils.settings import settings
@@ -30,17 +31,47 @@ from fastapi_sso.sso.base import SSOBase
 router = APIRouter()
 
 
+@router.post("/initial-registration", response_model_exclude_none=True)
+async def initial_registration(request: InitialRegistrationRequest):
+    if request.email:
+        otp = Otp(
+            user_shortname=special_to_underscore(request.email),
+            otp_for=OTPFor.mail_verification,
+            otp=f"{random.randint(111111, 999999)}",
+        )
+        await otp.store()
+
+        await UserVerification.send(request.email, otp.otp)
+
+    if request.mobile:
+        otp = Otp(
+            user_shortname=request.mobile,
+            otp_for=OTPFor.mobile_verification,
+            otp=f"{random.randint(111111, 999999)}",
+        )
+        await otp.store()
+
+        await SMSSender.send(request.mobile, otp.otp)
+
+    return ApiResponse(status=Status.success, message="OTP sent successfully")
+
+
 @router.post("/register", response_model_exclude_none=True)
 async def register(request: RegisterRequest):
+    await request.validate_otps()
+
     user_model = User(
-        **request.model_dump(exclude=["password_confirmation"], exclude_none=True)
+        **request.model_dump(
+            exclude=["password_confirmation", "email_otp", "mobile_otp"],
+            exclude_none=True,
+        ),
     )
 
     await user_model.store()
 
     return ApiResponse(
         status=Status.success,
-        message="Account created successfully, please check your mail for the verification code",
+        message="Account created successfully",
         data=user_model.represent(),
     )
 
@@ -50,13 +81,7 @@ async def verify_email(
     email: Annotated[str, Body(examples=["myname@email.com"])],
     otp: Annotated[str, Body(examples=["123456"])],
 ):
-    user: User | None = await User.find(f"@full_email:{{{escape_for_redis(email)}}}")
-
-    if not user:
-        raise ApiException(
-            status_code=404,
-            error=Error(type="db", code=12, message="User not found"),
-        )
+    user: User = await User.get_or_fail(f"@full_email:{{{escape_for_redis(email)}}}")
 
     if user.is_email_verified:
         raise ApiException(
@@ -69,7 +94,9 @@ async def verify_email(
         )
 
     otp_model = Otp(
-        user_shortname=user.shortname, otp=otp, otp_for=OTPFor.mail_verification
+        user_shortname=special_to_underscore(user.email),
+        otp=otp,
+        otp_for=OTPFor.mail_verification,
     )
     otp_exists = await otp_model.get_and_del()
 
@@ -90,13 +117,7 @@ async def verify_mobile(
     mobile: Annotated[str, Body(examples=["7999228903"])],
     otp: Annotated[str, Body(examples=["123456"])],
 ):
-    user: User | None = await User.find(f"@mobile:{mobile}")
-
-    if not user:
-        raise ApiException(
-            status_code=404,
-            error=Error(type="db", code=12, message="User not found"),
-        )
+    user: User = await User.get_or_fail(f"@mobile:{mobile}")
 
     if user.is_mobile_verified:
         raise ApiException(
@@ -109,7 +130,7 @@ async def verify_mobile(
         )
 
     otp_model = Otp(
-        user_shortname=user.shortname, otp=otp, otp_for=OTPFor.mobile_verification
+        user_shortname=user.mobile, otp=otp, otp_for=OTPFor.mobile_verification
     )
     otp_exists = await otp_model.get_and_del()
 
@@ -131,22 +152,20 @@ async def resend_verification_email(
 ):
     user: User | None = await User.find(f"@full_email:{{{escape_for_redis(email)}}}")
 
-    if not user or user.is_email_verified:
+    if user and user.is_email_verified:
         raise ApiException(
             status_code=404,
-            error=Error(
-                type="db", code=33, message="User not found or already verified"
-            ),
+            error=Error(type="db", code=33, message="User already verified"),
         )
 
     otp = Otp(
-        user_shortname=user.shortname,
+        user_shortname=special_to_underscore(email),
         otp_for=OTPFor.mail_verification,
         otp=f"{random.randint(111111, 999999)}",
     )
     await otp.store()
 
-    await UserVerification.send(user.email, otp.otp)
+    await UserVerification.send(email, otp.otp)
 
     return ApiResponse(status=Status.success, message="Email sent successfully")
 
@@ -157,16 +176,14 @@ async def resend_verification_sms(
 ):
     user: User | None = await User.find(f"@mobile:{mobile}")
 
-    if not user or user.is_mobile_verified:
+    if user and user.is_mobile_verified:
         raise ApiException(
             status_code=404,
-            error=Error(
-                type="db", code=33, message="User not found or already verified"
-            ),
+            error=Error(type="db", code=33, message="User already verified"),
         )
 
     otp = Otp(
-        user_shortname=user.shortname,
+        user_shortname=mobile,
         otp_for=OTPFor.mobile_verification,
         otp=f"{random.randint(111111, 999999)}",
     )
@@ -422,7 +439,7 @@ async def social_login(access_token: str, sso: SSOBase, provider: str):
 
 @router.post("/logout")
 async def logout(response: Response, request: Request, shortname=Depends(JWTBearer())):
-    user: User | None = await User.get_or_fail(shortname)
+    user: User = await User.get_or_fail(shortname)
 
     if user.firebase_token:
         user.firebase_token = None

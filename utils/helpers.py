@@ -16,3 +16,9 @@ def escape_for_redis(s: str) -> str:
             {".": r"\.", "@": r"\@", ":": r"\:", "/": r"\/", "-": r"\-", " ": r"\ "}
         )
     )
+
+
+def special_to_underscore(s: str) -> str:
+    return s.translate(
+        str.maketrans({".": "_", "@": "_", ":": "_", "/": "_", "-": "_", " ": "_"})
+    )

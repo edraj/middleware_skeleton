@@ -3,6 +3,7 @@ from mail.user_verification import UserVerification as UserVerificationMail
 import random
 from models.base.enums import OTPFor
 from models.otp import Otp
+from utils.helpers import special_to_underscore
 
 
 class UserUpdatedListener:
@@ -19,7 +20,7 @@ class UserUpdatedListener:
         if "email" in self.updated and self.user.is_email_verified:
             self.user.is_email_verified = False
             mail_otp = Otp(
-                user_shortname=self.user.shortname,
+                user_shortname=special_to_underscore(self.user.email),
                 otp_for=OTPFor.mail_verification,
                 otp=f"{random.randint(111111, 999999)}",
             )
@@ -30,7 +31,7 @@ class UserUpdatedListener:
         if "mobile" in self.updated and self.user.is_mobile_verified:
             self.user.is_mobile_verified = False
             mobile_otp = Otp(
-                user_shortname=self.user.shortname,
+                user_shortname=self.user.mobile,
                 otp_for=OTPFor.mobile_verification,
                 otp=f"{random.randint(111111, 999999)}",
             )

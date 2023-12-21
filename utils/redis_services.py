@@ -70,6 +70,9 @@ class RedisServices(object):
         else:
             return None
 
+    async def delete(self, key) -> None:
+        await self.client.delete(key)
+
     async def set(self, key, value, ex=None, nx: bool = False):
         return await self.client.set(key, value, ex=ex, nx=nx)
 

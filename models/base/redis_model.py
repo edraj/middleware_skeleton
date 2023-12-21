@@ -31,3 +31,7 @@ class RedisModel(BaseModel):
     async def get(self) -> str | None:
         async with RedisServices() as redis:
             return await redis.get(key=self.get_key())
+
+    async def delete(self) -> None:
+        async with RedisServices() as redis:
+            return await redis.delete(key=self.get_key())
