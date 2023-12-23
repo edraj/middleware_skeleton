@@ -1,8 +1,8 @@
 import random
 from typing import Annotated
 import aiohttp
-from fastapi import APIRouter, Body, Depends, Query, Request, Response
-from api.auth.Requests.initial_registration_request import InitialRegistrationRequest
+from fastapi import APIRouter, Body, Depends, Request, Response
+from api.auth.Requests.otp_request import OTPRequest
 from api.auth.Requests.login_request import LoginRequest
 from api.auth.Requests.register_request import RegisterRequest
 from api.auth.Requests.reset_password_request import ResetPasswordRequest
@@ -31,8 +31,8 @@ from fastapi_sso.sso.base import SSOBase
 router = APIRouter()
 
 
-@router.post("/initial-registration", response_model_exclude_none=True)
-async def initial_registration(request: InitialRegistrationRequest):
+@router.post("/otp-request", response_model_exclude_none=True)
+async def otp_request(request: OTPRequest):
     if request.email:
         otp = Otp(
             user_shortname=special_to_underscore(request.email),
@@ -58,7 +58,13 @@ async def initial_registration(request: InitialRegistrationRequest):
 
 @router.post("/register", response_model_exclude_none=True)
 async def register(request: RegisterRequest):
-    await request.validate_otps()
+    is_valid_otp = await Otp.validate_otps(request.model_dump())
+
+    if not is_valid_otp:
+        raise ApiException(
+            status_code=404,
+            error=Error(type="Invalid request", code=307, message="Invalid OTP"),
+        )
 
     user_model = User(
         **request.model_dump(
@@ -67,6 +73,12 @@ async def register(request: RegisterRequest):
         ),
     )
 
+    if request.email:
+        user_model.is_email_verified = True
+
+    if request.mobile:
+        user_model.is_mobile_verified = True
+
     await user_model.store()
 
     return ApiResponse(
@@ -74,124 +86,6 @@ async def register(request: RegisterRequest):
         message="Account created successfully",
         data=user_model.represent(),
     )
-
-
-@router.post("/verify-email", response_model_exclude_none=True)
-async def verify_email(
-    email: Annotated[str, Body(examples=["myname@email.com"])],
-    otp: Annotated[str, Body(examples=["123456"])],
-):
-    user: User = await User.get_or_fail(f"@full_email:{{{escape_for_redis(email)}}}")
-
-    if user.is_email_verified:
-        raise ApiException(
-            status_code=400,
-            error=Error(
-                type="db",
-                code=12,
-                message="User's email has already been verified, please go to login",
-            ),
-        )
-
-    otp_model = Otp(
-        user_shortname=special_to_underscore(user.email),
-        otp=otp,
-        otp_for=OTPFor.mail_verification,
-    )
-    otp_exists = await otp_model.get_and_del()
-
-    if not otp_exists:
-        return ApiResponse(
-            status=Status.failed,
-            error=Error(type="Invalid request", code=307, message="Invalid OTP"),
-        )
-
-    user.is_email_verified = True
-    await user.sync()
-
-    return ApiResponse(status=Status.success, message="Email verified successfully")
-
-
-@router.post("/verify-mobile", response_model_exclude_none=True)
-async def verify_mobile(
-    mobile: Annotated[str, Body(examples=["7999228903"])],
-    otp: Annotated[str, Body(examples=["123456"])],
-):
-    user: User = await User.get_or_fail(f"@mobile:{mobile}")
-
-    if user.is_mobile_verified:
-        raise ApiException(
-            status_code=400,
-            error=Error(
-                type="db",
-                code=12,
-                message="User's mobile has already been verified, please go to login",
-            ),
-        )
-
-    otp_model = Otp(
-        user_shortname=user.mobile, otp=otp, otp_for=OTPFor.mobile_verification
-    )
-    otp_exists = await otp_model.get_and_del()
-
-    if not otp_exists:
-        return ApiResponse(
-            status=Status.failed,
-            error=Error(type="Invalid request", code=307, message="Invalid OTP"),
-        )
-
-    user.is_mobile_verified = True
-    await user.sync()
-
-    return ApiResponse(status=Status.success, message="mobile verified successfully")
-
-
-@router.get("/resend-verification-email", response_model_exclude_none=True)
-async def resend_verification_email(
-    email: Annotated[str, Query(examples=["myname@email.com"])]
-):
-    user: User | None = await User.find(f"@full_email:{{{escape_for_redis(email)}}}")
-
-    if user and user.is_email_verified:
-        raise ApiException(
-            status_code=404,
-            error=Error(type="db", code=33, message="User already verified"),
-        )
-
-    otp = Otp(
-        user_shortname=special_to_underscore(email),
-        otp_for=OTPFor.mail_verification,
-        otp=f"{random.randint(111111, 999999)}",
-    )
-    await otp.store()
-
-    await UserVerification.send(email, otp.otp)
-
-    return ApiResponse(status=Status.success, message="Email sent successfully")
-
-
-@router.get("/resend-verification-sms", response_model_exclude_none=True)
-async def resend_verification_sms(
-    mobile: Annotated[str, Query(examples=["7999228903"])]
-):
-    user: User | None = await User.find(f"@mobile:{mobile}")
-
-    if user and user.is_mobile_verified:
-        raise ApiException(
-            status_code=404,
-            error=Error(type="db", code=33, message="User already verified"),
-        )
-
-    otp = Otp(
-        user_shortname=mobile,
-        otp_for=OTPFor.mobile_verification,
-        otp=f"{random.randint(111111, 999999)}",
-    )
-    await otp.store()
-
-    await SMSSender.send(user.mobile, otp.otp)
-
-    return ApiResponse(status=Status.success, message="SMS sent successfully")
 
 
 @router.post("/login", response_model_exclude_none=True)

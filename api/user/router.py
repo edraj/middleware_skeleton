@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from api.schemas.response import ApiException, ApiResponse, Error
 from api.user.Requests.user_update_request import UserUpdateRequest
 from models.base.enums import Status
+from models.otp import Otp
 from models.user import User
 from utils.jwt import JWTBearer
 
@@ -28,9 +29,17 @@ async def profile(shortname=Depends(JWTBearer())):
 
 @router.put("", response_model_exclude_none=True)
 async def update(request: UserUpdateRequest, shortname=Depends(JWTBearer())):
+    is_valid_otp = await Otp.validate_otps(request.model_dump())
+
+    if not is_valid_otp:
+        raise ApiException(
+            status_code=404,
+            error=Error(type="Invalid request", code=307, message="Invalid OTP"),
+        )
+
     user: User | None = await User.get(shortname)
 
-    data = request.model_dump(exclude_none=True)
+    data = request.model_dump(exclude_none=True, exclude=["mobile_otp", "email_otp"])
 
     for key, value in data.items():
         setattr(user, key, value)
