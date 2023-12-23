@@ -21,7 +21,7 @@ security = HTTPBearer()
 @router.post("/create")
 async def create_order(request: CreateOrderRequest, _=Depends(JWTBearer())):
     order_model = Order(
-        **request.model_dump(exclude=["password_confirmation"], exclude_none=True)
+        **request.model_dump(exclude={"password_confirmation"}, exclude_none=True)
     )
 
     await order_model.store()
@@ -144,12 +144,14 @@ async def upload_attachment(
 ):
     order: Order = await Order.get_or_fail(shortname)
 
-    attached = await order.attach(
-        payload=file.file,
-        payload_file_name=file.filename,
-        payload_mime_type=file.content_type,
-        entry_shortname=document_name,
-    )
+    attached: bool = False
+    if file.file and file.filename and file.content_type:
+        attached: bool = await order.attach(
+            payload=file.file,
+            payload_file_name=file.filename,
+            payload_mime_type=file.content_type,
+            entry_shortname=document_name,
+        )
 
     if attached:
         return ApiResponse(status=Status.success, message="Media attached successfully")

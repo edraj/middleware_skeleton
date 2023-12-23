@@ -2,27 +2,29 @@ import typing
 from starlette.types import Receive, Scope, Send
 from fastapi.logger import logger
 from fastapi.responses import JSONResponse
+from starlette.background import BackgroundTask
 import json
 from cryptography.fernet import Fernet
 from utils.settings import settings
 
 
-def clean_dict(dict_with_nones):
+def clean_dict(dict_with_nones: typing.Any) -> dict[str, typing.Any]:
     if not isinstance(dict_with_nones, dict):
         return dict_with_nones
-    result = {}
-    for key, value in dict_with_nones.items():
+
+    result: dict[str, typing.Any] = {}
+    for key, value in dict_with_nones.items():  # type: ignore
         if value is not None:
-            result[key] = clean_dict(value)
+            result[key] = clean_dict(value)  # type: ignore
     return result
 
 
-def safe_log_body(request_body=None):
+def safe_log_body(request_body: dict[str, typing.Any] | None = None):
     """
     safe loging the body by hashing the password
     """
 
-    if "password" in request_body:
+    if request_body and request_body.get("password"):
         key = settings.logger_password_hash_key.encode()
         f = Fernet(key)
         new_body = request_body.copy()
@@ -35,11 +37,11 @@ def safe_log_body(request_body=None):
 class MainResponse(JSONResponse):
     def __init__(
         self,
-        content,
+        content: typing.Any,
         status_code: int = 200,
-        headers=None,
-        media_type="application/json",
-        background=None,
+        headers: typing.Optional[typing.Dict[str, str]] = None,
+        media_type: str = "application/json",
+        background: typing.Optional[BackgroundTask] = None,
     ) -> None:
         super().__init__(content, status_code, headers, media_type, background)
         pass
@@ -60,12 +62,12 @@ class MainResponse(JSONResponse):
         except Exception as e:
             logger.error("Error", extra={"props": {"message": str(e)}})
 
-    def render(self, content: typing.Any):
+    def render(self, content: typing.Any) -> bytes:
         try:
-            try:
-                data = content if type(content) is dict else json.loads(content)
-            except ValueError:
-                data = {"error": content}
-            return json.dumps(clean_dict(data), indent=2)
-        except Exception as e:
-            logger.error("Error", extra={"props": {"message": str(e)}})
+            data: dict[str, typing.Any] = (
+                content if isinstance(content, dict) else json.loads(content)
+            )
+        except ValueError:
+            data: dict[str, typing.Any] = {"error": content}
+
+        return json.dumps(clean_dict(data), indent=2).encode("utf-8")

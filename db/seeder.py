@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
 from datetime import datetime
+from io import TextIOWrapper
 import json
 import os
 import shutil
+from typing import Any
 from uuid import uuid4
 
 """Steps
@@ -20,7 +22,7 @@ def create_json_entry_meta(
     path: str, shortname: str, schema_shortname: str, has_payload: bool = True
 ):
     entry_meta = open(path, "w")
-    data = {
+    data: dict[str, Any] = {
         "uuid": str(uuid4()),
         "shortname": shortname,
         "is_active": True,
@@ -38,10 +40,10 @@ def create_json_entry_meta(
     entry_meta.close()
 
 
-def create_json_entry_payload(path: str, data_file_path: dict):
+def create_json_entry_payload(path: str, data_file_path: str) -> None:
     entry_meta = open(path, "w")
 
-    data_file = open(data_file_path, "r")
+    data_file: TextIOWrapper = open(data_file_path, "r")
     data = json.dumps(json.load(data_file))
     data_file.close()
 

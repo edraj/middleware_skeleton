@@ -1,6 +1,8 @@
 import asyncio
+from typing import Any
 from fastapi.logger import logger
 from redis.asyncio import BlockingConnectionPool, Redis
+from redis.typing import ExpiryT, KeyT, EncodableT
 from utils.settings import settings
 
 
@@ -24,7 +26,7 @@ class RedisServices(object):
             self.client = await Redis(connection_pool=self.POOL)
             if self.is_pytest:
                 try:
-                    await self.client.ping()
+                    await self.client.ping()  # type: ignore
                 except RuntimeError:
                     pass
         return self
@@ -45,41 +47,47 @@ class RedisServices(object):
             self.client = await Redis(connection_pool=self.POOL)
             if self.is_pytest:
                 try:
-                    await self.client.ping()
+                    await self.client.ping()  # type: ignore
                 except RuntimeError:
                     pass
         return self
 
-    async def __aexit__(self, exc_type, exc, tb):
-        exc_type = exc_type
-        exc = exc
-        tb = tb
+    async def __aexit__(self, exc_type, exc, tb) -> None:  # type: ignore
+        # exc_type = exc_type
+        # exc = exc
+        # tb = tb
         await self.client.aclose()
 
-    async def get(self, key) -> str | None:
-        value = await self.client.get(key)
+    async def get(self, key: KeyT) -> str | None:
+        value: Any = await self.client.get(key)  # type: ignore
         if isinstance(value, str):
             return value
         else:
             return None
 
-    async def getdel(self, key) -> str | None:
-        value = await self.client.getdel(key)
+    async def getdel(self, key: KeyT) -> str | None:
+        value: Any = await self.client.getdel(key)  # type: ignore
         if isinstance(value, str):
             return value
         else:
             return None
 
-    async def delete(self, key) -> None:
-        await self.client.delete(key)
+    async def delete(self, key: KeyT) -> None:
+        await self.client.delete(key)  # type: ignore
 
-    async def set(self, key, value, ex=None, nx: bool = False):
-        return await self.client.set(key, value, ex=ex, nx=nx)
+    async def set(
+        self,
+        key: KeyT,
+        value: EncodableT,
+        ex: ExpiryT | None = None,
+        nx: bool = False,
+    ) -> None:
+        await self.client.set(key, value, ex=ex, nx=nx)  # type: ignore
 
-    async def get_keys(self, pattern: str = "*") -> list:
+    async def get_keys(self, pattern: str = "*") -> list[Any]:
         try:
-            value = await self.client.keys(pattern)
-            if isinstance(value, list):
+            value: Any = await self.client.keys(pattern)  # type: ignore
+            if type(value) is list[Any]:
                 return value
         except Exception as e:
             logger.warning(f"Error at redis_services.get_keys: {e}")

@@ -1,3 +1,4 @@
+from typing import Any
 from pydantic import Field
 from models.base.enums import OTPFor
 from models.base.redis_model import RedisModel
@@ -18,16 +19,17 @@ class Otp(RedisModel):
         return settings.otp_expire
 
     @staticmethod
-    async def validate_otps(data: dict) -> bool:
+    async def validate_otps(data: dict[str, Any]) -> bool:
         if not data.get("email") and not data.get("mobile"):
             return True
 
         mail_otp_found = False
+        mail_otp_model = None
 
         if data.get("email"):
             mail_otp_model = Otp(
-                user_shortname=special_to_underscore(data.get("email")),
-                otp=data.get("email_otp"),
+                user_shortname=special_to_underscore(data.get("email", "")),
+                otp=data.get("email_otp", ""),
                 otp_for=OTPFor.mail_verification,
             )
 
@@ -38,15 +40,15 @@ class Otp(RedisModel):
 
         if data.get("mobile"):
             otp_model = Otp(
-                user_shortname=data.get("mobile"),
-                otp=data.get("mobile_otp"),
+                user_shortname=data.get("mobile", ""),
+                otp=data.get("mobile_otp", ""),
                 otp_for=OTPFor.mobile_verification,
             )
 
             if await otp_model.get_and_del() is None:
                 return False
 
-        if mail_otp_found:
+        if mail_otp_found and mail_otp_model:
             await mail_otp_model.delete()
 
         return True

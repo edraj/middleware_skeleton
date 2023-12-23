@@ -1,3 +1,4 @@
+from typing import Any
 from pydantic import Field, BaseModel
 from models.base.enums import DeliverStatus, Language
 from models.base.ticket_model import TicketModel
@@ -22,11 +23,11 @@ class Order(TicketModel):
     workflow_shortname: str = "order"
     resolution_reason: str | None = None
     iccid: str = "8858774455555"
-    attachments: dict | None = None
+    attachments: dict[str, Any] | None = None
 
     @classmethod
-    def payload_body_attributes(self) -> list:
-        return [
+    def payload_body_attributes(cls) -> set[str]:
+        return {
             "name",
             "address",
             "mobile",
@@ -36,14 +37,14 @@ class Order(TicketModel):
             "planned_delivery_date",
             "scheduled_delivery",
             "iccid",
-        ]
+        }
 
     @classmethod
-    def class_attributes(self) -> dict:
-        return ["state", "workflow_shortname", "resolution_reason", "attachments"]
+    def class_attributes(cls) -> set[str]:
+        return {"state", "workflow_shortname", "resolution_reason", "attachments"}
 
-    def represent(self) -> dict:
+    def represent(self) -> dict[str, Any]:
         return self.model_dump(
-            exclude=["workflow_shortname"],
+            exclude={"workflow_shortname"},
             exclude_none=True,
         )

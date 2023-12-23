@@ -5,7 +5,7 @@ from utils.mailer import mailer
 
 class UserVerification:
     @staticmethod
-    async def send(email: str, otp):
+    async def send(email: str, otp: str) -> None:
         html = f"""
         <p>Use this code to verify your email {otp}</p> 
         """

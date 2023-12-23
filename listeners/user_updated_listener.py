@@ -1,15 +1,10 @@
-from services.sms_sender import SMSSender
-from mail.user_verification import UserVerification as UserVerificationMail
-import random
-from models.base.enums import OTPFor
-from models.otp import Otp
-from utils.helpers import special_to_underscore
+from typing import Any
 
 
 class UserUpdatedListener:
-    def __init__(self, user, updated: list) -> None:
+    def __init__(self, user: Any, updated: set[str]) -> None:
         self.user = user
-        self.updated = updated
+        self.updated: set[str] = updated
 
     async def handle(self) -> None:
         is_outdated = False
@@ -44,4 +39,4 @@ class UserUpdatedListener:
         #     is_outdated = True
 
         if is_outdated:
-            await self.user.sync()
+            await self.user.sync()  # type: ignore

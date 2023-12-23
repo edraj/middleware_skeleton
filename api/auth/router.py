@@ -1,5 +1,6 @@
 import random
-from typing import Annotated
+from typing import Annotated, Any
+from venv import logger
 import aiohttp
 from fastapi import APIRouter, Body, Depends, Request, Response
 from api.auth.Requests.otp_request import OTPRequest
@@ -22,6 +23,7 @@ from utils.helpers import escape_for_redis, special_to_underscore
 from utils.jwt import JWTBearer, sign_jwt
 from utils.password_hashing import hash_password, verify_password
 from utils.settings import settings
+from fastapi_sso.sso.base import OpenID
 from fastapi_sso.sso.google import GoogleSSO
 from fastapi_sso.sso.facebook import FacebookSSO
 from fastapi_sso.sso.github import GithubSSO
@@ -68,7 +70,7 @@ async def register(request: RegisterRequest):
 
     user_model = User(
         **request.model_dump(
-            exclude=["password_confirmation", "email_otp", "mobile_otp"],
+            exclude={"password_confirmation", "email_otp", "mobile_otp"},
             exclude_none=True,
         ),
     )
@@ -109,6 +111,7 @@ async def login(response: Response, request: LoginRequest):
             (request.email and not user.is_email_verified)
             or (request.mobile and not user.is_mobile_verified)
         )
+        or not user.password
         or not verify_password(request.password, user.password)
     ):
         raise ApiException(
@@ -297,34 +300,51 @@ async def microsoft_login(
     )
 
 
-async def social_login(access_token: str, sso: SSOBase, provider: str):
+async def social_login(access_token: str, sso: SSOBase, provider: str) -> User:
     async with aiohttp.ClientSession() as session:
-        user_profile_endpoint = await sso.userinfo_endpoint
-        response = await session.get(
-            user_profile_endpoint, headers={"Authorization": f"Bearer {access_token}"}
-        )
-        if response.status != 200:
+        user_profile_endpoint: str | None = await sso.userinfo_endpoint
+        response = None
+        if user_profile_endpoint:
+            response = await session.get(
+                user_profile_endpoint,
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+        if not response or response.status != 200:
             raise ApiException(
                 status_code=400,
                 error=Error(type="data", code=12, message="Invalid access token"),
             )
 
-        content = await response.json()
-        provider_user = await sso.openid_from_response(content)
+        content: dict[str, Any] = await response.json()
+        provider_user: OpenID = await sso.openid_from_response(content)  # type: ignore
 
     user_model: User | None = await User.find(
         search=f"@{provider}_id:{provider_user.id}"
     )
 
     if not user_model:
-        user_model = User(
-            first_name=provider_user.first_name,
-            last_name=provider_user.last_name,
-            email=provider_user.email,
-            is_email_verified=True,
-            profile_pic_url=provider_user.picture,
-        )
-        setattr(user_model, f"{provider}_id", provider_user.id)
+        try:
+            user_model = User(
+                **provider_user.model_dump(include={"first_name", "last_name", "email"})
+            )
+            user_model.is_email_verified = True
+            setattr(user_model, f"{provider}_id", provider_user.id)
+
+        except Exception as e:
+            logger.error(
+                "Invalid SSO provider data",
+                {
+                    "provider": provider,
+                    "user_profile_endpoint": user_profile_endpoint,
+                    "response": content,
+                    "provider_user": provider_user,
+                    "error": e.args,
+                },
+            )
+            raise ApiException(
+                status_code=400,
+                error=Error(type="data", code=12, message="Invalid provider data"),
+            )
 
         await user_model.store(trigger_events=False)
 
@@ -332,16 +352,18 @@ async def social_login(access_token: str, sso: SSOBase, provider: str):
 
 
 @router.post("/logout")
-async def logout(response: Response, request: Request, shortname=Depends(JWTBearer())):
+async def logout(
+    response: Response, request: Request, shortname: str = Depends(JWTBearer())
+):
     user: User = await User.get_or_fail(shortname)
 
     if user.firebase_token:
         user.firebase_token = None
-        user.sync()
+        await user.sync()
 
     decoded_data = await JWTBearer().extract_and_decode(request)
     inactive_token = InactiveToken(
-        token=decoded_data.get("token"), expires=str(decoded_data.get("expires"))
+        token=decoded_data.get("token", ""), expires=str(decoded_data.get("expires"))
     )
     await inactive_token.store()
 
