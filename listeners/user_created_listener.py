@@ -1,12 +1,8 @@
-from services.sms_sender import SMSSender
-from mail.user_verification import UserVerification as UserVerificationMail
-import random
-from models.base.enums import OTPFor
-from models.otp import Otp
+from typing import Any
 
 
 class UserCreatedListener:
-    def __init__(self, user) -> None:
+    def __init__(self, user: Any) -> None:
         self.user = user
 
     async def handle(self):

@@ -1,19 +1,24 @@
 import json
 from fastapi.testclient import TestClient
+from httpx import Response
 from main import app
 from fastapi import status
+from utils.helpers import special_to_underscore
 
 from utils.redis_services import RedisServices
 
 client = TestClient(app)
 
 
-async def get_otps(shortname: str):
+async def get_otps(identifier: str) -> list[str]:
     async with RedisServices() as redis:
-        return await redis.get_keys(f"{shortname}:*")
+        escaped: str = special_to_underscore(identifier)
+        res = await redis.get_keys(f"{escaped}:*")
+        print(f"\n\n {escaped = } \n {res = } \n\n")
+        return res
 
 
-def assert_code_and_status_success(response):
+def assert_code_and_status_success(response: Response) -> None:
     json_response = response.json()
     # if (
     #     response.status_code != status.HTTP_200_OK

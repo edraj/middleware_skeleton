@@ -1,9 +1,10 @@
+from httpx import Response
 import pytest
 from models.base.enums import CancellationReason
 from tests.base_test import assert_code_and_status_success, client
 
-ORDER_SHORTNAME = None
-ORDER_PAYLOAD = {
+_order_shortname = None
+ORDER_PAYLOAD: dict[str, str | dict[str, str]] = {
     "name": "John",
     "address": "Baghdad",
     "mobile": "2355806229",
@@ -14,29 +15,29 @@ ORDER_PAYLOAD = {
 
 @pytest.mark.run(order=2)
 def test_create_order():
-    global ORDER_SHORTNAME
+    global _order_shortname
     response = client.post(
         "/order/create",
         json=ORDER_PAYLOAD,
     )
     assert_code_and_status_success(response)
     json_response = response.json()
-    ORDER_SHORTNAME = json_response.get("data", {}).get("shortname")
+    _order_shortname = json_response.get("data", {}).get("shortname")
 
 
 @pytest.mark.run(order=2)
 def test_track_order():
-    global ORDER_SHORTNAME
-    response = client.get(f"order/{ORDER_SHORTNAME}/track")
+    global _order_shortname
+    response = client.get(f"order/{_order_shortname}/track")
     assert_code_and_status_success(response)
     assert response.json().get("data", {}).get("order", {}).get("state") == "pending"
 
 
 @pytest.mark.run(order=2)
 def test_update_order():
-    global ORDER_SHORTNAME
+    global _order_shortname
     response = client.put(
-        f"order/{ORDER_SHORTNAME}/update",
+        f"order/{_order_shortname}/update",
         json={
             "tracking_id": "2390849311212",
             "planned_delivery_date": "2023-12-13T21:06:25.242772",
@@ -52,7 +53,7 @@ def test_update_order():
 def test_attach_to_order():
     with open("tests/data/order_attachment.jpeg", "rb") as attachment_file:
         response = client.post(
-            f"/order/{ORDER_SHORTNAME}/attach",
+            f"/order/{_order_shortname}/attach",
             data={"document_name": "order_sample_attachment"},
             files={
                 "file": (
@@ -75,12 +76,12 @@ def test_query_assigned_orders():
 
 @pytest.mark.run(order=2)
 def test_assign_order():
-    response = client.post(
+    response: Response = client.post(
         "/order/create",
         json=ORDER_PAYLOAD,
     )
     assert_code_and_status_success(response)
-    order_shortname = response.json().get("data", {}).get("shortname")
+    order_shortname: str = response.json().get("data", {}).get("shortname", "")
 
     response = client.put(f"order/{order_shortname}/assign")
     assert_code_and_status_success(response)

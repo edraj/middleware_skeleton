@@ -84,11 +84,9 @@ class RedisServices(object):
     ) -> None:
         await self.client.set(key, value, ex=ex, nx=nx)  # type: ignore
 
-    async def get_keys(self, pattern: str = "*") -> list[Any]:
+    async def get_keys(self, pattern: str = "*") -> Any:
         try:
-            value: Any = await self.client.keys(pattern)  # type: ignore
-            if type(value) is list[Any]:
-                return value
+            return await self.client.keys(pattern)  # type: ignore
         except Exception as e:
             logger.warning(f"Error at redis_services.get_keys: {e}")
         return []

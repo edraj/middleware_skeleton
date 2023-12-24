@@ -22,7 +22,7 @@ class LoginRequest(BaseModel):
     }
 
     @model_validator(mode="after")
-    def define_required_fields(self) -> "LoginRequest":
+    def define_required_fields(self):
         if not self.email and not self.mobile:
             raise ValueError("Email or Mobile is required")
 

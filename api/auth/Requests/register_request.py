@@ -1,9 +1,6 @@
 from pydantic import BaseModel, Field, ValidationInfo, field_validator
-from api.schemas.response import ApiException, Error
-from models.base.enums import Language, OTPFor, OperatingSystems
-from models.otp import Otp
+from models.base.enums import Language, OperatingSystems
 from utils import regex
-from utils.helpers import special_to_underscore
 
 
 class RegisterRequest(BaseModel):
@@ -23,6 +20,7 @@ class RegisterRequest(BaseModel):
     language: Language | None = None
     is_email_verified: bool = False
     is_mobile_verified: bool = False
+    invitation_code: str | None = None
 
     model_config = {
         "json_schema_extra": {
