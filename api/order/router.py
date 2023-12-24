@@ -1,11 +1,12 @@
 from typing import Annotated
-from fastapi import Depends, Path as PathParam  # Form
+from fastapi import Depends, Path as PathParam, Form
 from fastapi.routing import APIRouter
 from api.order.requests.create_order_request import CreateOrderRequest
 from api.order.requests.update_order import UpdateOrderRequest
 from api.schemas.response import ApiResponse
 from models.base.enums import CancellationReason, DeliverStatus, Status
 from fastapi.security import HTTPBearer
+from fastapi import UploadFile
 
 # from fastapi import UploadFile
 from models.order import Order
@@ -22,7 +23,7 @@ security = HTTPBearer()
 @router.post("/create")
 async def create_order(request: CreateOrderRequest, _=Depends(JWTBearer())):
     order_model = Order(
-        **request.model_dump(exclude=["password_confirmation"], exclude_none=True)
+        **request.model_dump(exclude={"password_confirmation"}, exclude_none=True)
     )
 
     await order_model.store()
@@ -132,30 +133,32 @@ async def order_query(order_status: DeliverStatus, _=Depends(JWTBearer())):
     )
 
 
-# @router.post("/{shortname}/attach")
-# async def upload_attachment(
-#     file: UploadFile,
-#     shortname: Annotated[
-#         str, PathParam(examples=["b775fdbe"], description="order shortname")
-#     ],
-#     document_name: Annotated[
-#         str, Form(examples=["front_citizen_id"], description="document name")
-#     ],
-#     _=Depends(JWTBearer()),
-# ):
-#     order: Order = await Order.get_or_fail(shortname)
-#
-#     attached = await order.attach(
-#         payload=file.file,
-#         payload_file_name=file.filename,
-#         payload_mime_type=file.content_type,
-#         entry_shortname=document_name,
-#     )
-#
-#     if attached:
-#         return ApiResponse(status=Status.success, message="Media attached successfully")
-#     else:
-#         return ApiResponse(
-#             status=Status.failed,
-#             message="Failed to upload the attachment, please try again",
-#         )
+@router.post("/{shortname}/attach")
+async def upload_attachment(
+    file: UploadFile,
+    shortname: Annotated[
+        str, PathParam(examples=["b775fdbe"], description="order shortname")
+    ],
+    document_name: Annotated[
+        str, Form(examples=["front_citizen_id"], description="document name")
+    ],
+    _=Depends(JWTBearer()),
+):
+    order: Order = await Order.get_or_fail(shortname)
+
+    attached: bool = False
+    if file.file and file.filename and file.content_type:
+        attached = await order.attach(
+            payload=file.file,
+            payload_file_name=file.filename,
+            payload_mime_type=file.content_type,
+            entry_shortname=document_name,
+        )
+
+    if attached:
+        return ApiResponse(status=Status.success, message="Media attached successfully")
+    else:
+        return ApiResponse(
+            status=Status.failed,
+            message="Failed to upload the attachment, please try again",
+        )

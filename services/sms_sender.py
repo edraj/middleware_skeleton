@@ -14,3 +14,4 @@ class SMSSender:
             return True
 
         # TODO: implement SMS sender
+        return True

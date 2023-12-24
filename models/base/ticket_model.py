@@ -1,3 +1,4 @@
+from typing import Any
 from api.schemas.response import ApiException, Error
 from models.base.enums import CancellationReason, ResourceType, Space
 from models.base.json_model import JsonModel, TJsonModel, model_data_mapper
@@ -20,17 +21,17 @@ class TicketModel(JsonModel):
             cancellation_reasons=cancellation_reasons,
         )
 
-    async def store(self) -> None:
-        await JsonModel.store(self, ResourceType.ticket)
+    async def store(self, resource_type: ResourceType = ResourceType.ticket) -> None:
+        await JsonModel.store(self, resource_type)
 
-    async def sync(self) -> None:
-        await JsonModel.sync(self, ResourceType.ticket)
+    async def sync(self, resource_type: ResourceType = ResourceType.ticket) -> None:
+        await JsonModel.sync(self, resource_type)
 
     @classmethod
     async def get(cls: type[TJsonModel], shortname: str) -> TJsonModel | None:
         model_name = snake_case(cls.__name__)
         try:
-            data: dict = await dmart.read(
+            data: dict[str, Any] = await dmart.read(
                 space_name=Space.acme,
                 subpath=model_data_mapper[model_name]["subpath"],
                 shortname=shortname,
@@ -39,14 +40,14 @@ class TicketModel(JsonModel):
             )
             return cls.payload_to_model(
                 attributes=data,
-                shortname=data.get("shortname"),
+                shortname=data.get("shortname", ""),
             )
         except Exception as _:
             return None
 
     @classmethod
-    async def get_or_fail(cls: type[TJsonModel], shortname: str) -> TJsonModel | None:
-        model = await cls.get(shortname)
+    async def get_or_fail(cls: type[TJsonModel], shortname: str) -> TJsonModel:
+        model: TJsonModel | None = await cls.get(shortname)
         if not model:
             raise ApiException(
                 status_code=404,
@@ -57,7 +58,7 @@ class TicketModel(JsonModel):
     async def refresh(self) -> None:
         model_name = snake_case(self.__class__.__name__)
         try:
-            data: dict = await dmart.read(
+            data: dict[str, Any] = await dmart.read(
                 space_name=Space.acme,
                 subpath=model_data_mapper[model_name]["subpath"],
                 shortname=self.shortname,
@@ -66,12 +67,13 @@ class TicketModel(JsonModel):
             )
             updated = self.__class__.payload_to_model(
                 attributes=data,
-                shortname=data.get("shortname"),
+                shortname=data.get("shortname", ""),
             )
-            for key, val in dict(updated).items():
-                setattr(self, key, val)
+            if updated:
+                for key, val in updated.model_dump().items():
+                    setattr(self, str(key), val)
         except Exception as e:
             logger.warn(f"Failed to refresh the model: {model_name}", {"error": e.args})
 
-    async def delete(self) -> None:
-        await JsonModel.delete(self, ResourceType.ticket)
+    async def delete(self, resource_type: ResourceType = ResourceType.ticket) -> None:
+        await JsonModel.delete(self, resource_type)

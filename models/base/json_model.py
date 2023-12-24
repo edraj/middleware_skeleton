@@ -1,6 +1,5 @@
 from api.schemas.response import ApiException, Error
-from io import BytesIO
-from typing import TypeVar
+from typing import Any, BinaryIO, Optional, Self, Type, TypeVar
 from fastapi.logger import logger
 from pydantic import BaseModel, Field
 
@@ -10,7 +9,7 @@ from utils.helpers import snake_case
 from utils import regex
 
 
-model_data_mapper: dict = {
+model_data_mapper: dict[str, dict[str, str]] = {
     "user": {"subpath": "users", "schema": Schema.user},
     "otp": {"subpath": "otps", "schema": Schema.otp},
     "inactive_token": {"subpath": "inactive_tokens", "schema": Schema.inactive_token},
@@ -24,18 +23,18 @@ TJsonModel = TypeVar("TJsonModel", bound="JsonModel")
 class JsonModel(BaseModel):
     shortname: str = Field(default=None, pattern=regex.NAME)
 
-    def __init__(self, **data):
+    def __init__(self, **data: dict[str, Any]) -> None:
         BaseModel.__init__(self, **data)
 
     @classmethod
-    def payload_body_attributes(cls) -> list:
-        cls_fields = list(cls.model_json_schema().get("properties").keys())
+    def payload_body_attributes(cls) -> set[str]:
+        cls_fields = set(cls.model_json_schema().get("properties", {}).keys())
         cls_fields.remove("shortname")
         return cls_fields
 
     @classmethod
-    def class_attributes(self) -> list:
-        return []
+    def class_attributes(cls) -> set[str]:
+        return set()
 
     async def store(self, resource_type: ResourceType = ResourceType.content) -> None:
         model_name = snake_case(self.__class__.__name__)
@@ -92,11 +91,13 @@ class JsonModel(BaseModel):
         )
 
     @classmethod
-    def payload_to_model(cls, attributes: dict, shortname: str) -> TJsonModel | None:
+    def payload_to_model(
+        cls, attributes: dict[str, Any], shortname: str
+    ) -> Optional[Self]:
         try:
             payload_body_attributes = cls.payload_body_attributes()
             class_attributes = cls.class_attributes()
-            model_fields = {}
+            model_fields: dict[str, Any] = {}
             for key, value in attributes.items():
                 if key in class_attributes:
                     model_fields[key] = value
@@ -104,20 +105,20 @@ class JsonModel(BaseModel):
                 if key in payload_body_attributes:
                     model_fields[key] = value
 
-            class_model = cls(**model_fields)
+            class_model: Self = cls(**model_fields)
             class_model.shortname = shortname
+            return class_model
         except Exception as e:
             logger.warn(
                 "Failed payload_to_model", extra={"data": attributes, "error": e}
             )
             return None
-        return class_model
 
     @classmethod
-    async def get(cls: type[TJsonModel], shortname: str) -> TJsonModel | None:
+    async def get(cls: Type[TJsonModel], shortname: str) -> TJsonModel | None:
         model_name = snake_case(cls.__name__)
         try:
-            data: dict = await dmart.read(
+            data: dict[str, Any] = await dmart.read(
                 space_name=Space.acme,
                 subpath=model_data_mapper[model_name]["subpath"],
                 shortname=shortname,
@@ -125,14 +126,14 @@ class JsonModel(BaseModel):
             )
             return cls.payload_to_model(
                 attributes=data,
-                shortname=data.get("shortname"),
+                shortname=data.get("shortname", ""),
             )
         except Exception as _:
             return None
 
     @classmethod
-    async def get_or_fail(cls: type[TJsonModel], shortname: str) -> TJsonModel | None:
-        model = await cls.get(shortname)
+    async def get_or_fail(cls: type[TJsonModel], shortname: str) -> TJsonModel:
+        model: TJsonModel | None = await cls.get(shortname)
         if not model:
             raise ApiException(
                 status_code=404,
@@ -143,29 +144,32 @@ class JsonModel(BaseModel):
     async def refresh(self) -> None:
         model_name = snake_case(self.__class__.__name__)
         try:
-            data: dict = await dmart.read(
+            data: dict[str, Any] = await dmart.read(
                 space_name=Space.acme,
                 subpath=model_data_mapper[model_name]["subpath"],
                 shortname=self.shortname,
                 retrieve_attachments=True,
             )
-            updated = self.__class__.payload_to_model(
+            updated_model = self.__class__.payload_to_model(
                 attributes=data,
-                shortname=data.get("shortname"),
+                shortname=data.get("shortname", ""),
             )
-            for key, val in dict(updated).items():
-                setattr(self, key, val)
+            if updated_model:
+                for key, val in updated_model.model_dump().items():
+                    setattr(self, str(key), val)
         except Exception as e:
             logger.warn(f"Failed to refresh the model: {model_name}", {"error": e.args})
 
     @classmethod
     async def find(cls: type[TJsonModel], search: str) -> TJsonModel | None:
         model_name = snake_case(cls.__name__)
-        result = await dmart.query(
+        result: dict[str, Any] = await dmart.query(
             space_name=Space.acme,
-            subpath=model_data_mapper.get(model_name, {}).get("subpath"),
+            subpath=model_data_mapper.get(model_name, {}).get("subpath", ""),
             search=search,
-            filter_schema_names=[model_data_mapper.get(model_name, {}).get("schema")],
+            filter_schema_names=[
+                model_data_mapper.get(model_name, {}).get("schema", "")
+            ],
         )
         if not result.get("records"):
             return None
@@ -179,20 +183,22 @@ class JsonModel(BaseModel):
     async def search(
         cls: type[TJsonModel],
         search: str,
-        filter_types: list = [],
+        filter_types: list[str] = [],
         retrieve_attachments: bool = False,
     ) -> list[TJsonModel]:
         model_name = snake_case(cls.__name__)
         result = await dmart.query(
             space_name=Space.acme,
-            subpath=model_data_mapper.get(model_name, {}).get("subpath"),
+            subpath=model_data_mapper.get(model_name, {}).get("subpath", ""),
             search=search,
-            filter_schema_names=[model_data_mapper.get(model_name, {}).get("schema")],
+            filter_schema_names=[
+                model_data_mapper.get(model_name, {}).get("schema", "")
+            ],
             filter_types=filter_types,
             retrieve_attachments=retrieve_attachments,
         )
 
-        models = []
+        models: list[Any] = []
 
         for record in result.get("records", []):
             record["attributes"]["attachments"] = record["attachments"]
@@ -207,7 +213,7 @@ class JsonModel(BaseModel):
 
     async def attach(
         self,
-        payload: BytesIO,
+        payload: BinaryIO,
         payload_file_name: str,
         payload_mime_type: str,
         entry_shortname: str | None = None,

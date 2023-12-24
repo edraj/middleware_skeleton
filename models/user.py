@@ -1,7 +1,8 @@
+from typing import Any
 from pydantic import Field
 from events.user_created import UserCreatedEvent
 from events.user_updated import UserUpdatedEvent
-from models.base.enums import Language, OperatingSystems
+from models.base.enums import Language, OperatingSystems, ResourceType
 from models.base.json_model import JsonModel
 from utils import regex
 from utils.password_hashing import hash_password
@@ -26,7 +27,11 @@ class User(JsonModel):
     github_id: str | None = None
     microsoft_id: str | None = None
 
-    async def store(self, trigger_events: bool = True):
+    async def store(
+        self,
+        resource_type: ResourceType = ResourceType.content,
+        trigger_events: bool = True,
+    ):
         if self.password:
             self.password = hash_password(self.password)
         self.full_email = [self.email]
@@ -36,15 +41,20 @@ class User(JsonModel):
         if trigger_events:
             await UserCreatedEvent(self).trigger()
 
-    async def sync(self, updated: list = [], trigger_events=True) -> None:
-        await JsonModel.sync(self)
+    async def sync(
+        self,
+        resource_type: ResourceType = ResourceType.content,
+        updated: set[str] = set(),
+        trigger_events: bool = True,
+    ) -> None:
+        await JsonModel.sync(self, resource_type)
 
         if trigger_events:
             await UserUpdatedEvent(self, updated).trigger()
 
-    def represent(self) -> dict:
+    def represent(self) -> dict[str, Any]:
         return self.model_dump(
-            exclude=[
+            exclude={
                 "password",
                 "password_confirmation",
                 "full_email",
@@ -53,6 +63,6 @@ class User(JsonModel):
                 "twitter_id",
                 "github_id",
                 "microsoft_id",
-            ],
+            },
             exclude_none=True,
         )
