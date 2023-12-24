@@ -92,13 +92,6 @@ async def register(request: RegisterRequest):
 
 @router.post("/login", response_model_exclude_none=True)
 async def login(response: Response, request: LoginRequest):
-    if not request.email and not request.mobile:
-        raise ApiException(
-            status_code=401,
-            error=Error(
-                type="auth", code=14, message="Please provide email or mobile number"
-            ),
-        )
     user: User | None = await User.find(
         f"@full_email:{{{escape_for_redis(request.email)}}}"
         if request.email
@@ -111,13 +104,26 @@ async def login(response: Response, request: LoginRequest):
             (request.email and not user.is_email_verified)
             or (request.mobile and not user.is_mobile_verified)
         )
-        or not user.password
-        or not verify_password(request.password, user.password)
+        or (
+            request.password
+            and user.password
+            and not verify_password(request.password, user.password)
+        )
     ):
         raise ApiException(
             status_code=401,
             error=Error(type="auth", code=14, message="Invalid Credentials"),
         )
+
+    if not request.password:
+        is_valid_otp: bool = await Otp.validate_otps(
+            request.model_dump(exclude_none=True)
+        )
+        if not is_valid_otp:
+            raise ApiException(
+                status_code=401,
+                error=Error(type="auth", code=14, message="Invalid OTP"),
+            )
 
     access_token = sign_jwt({"username": user.shortname}, settings.jwt_access_expires)
 
