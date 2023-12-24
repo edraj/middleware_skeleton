@@ -1,5 +1,5 @@
 from typing import Annotated
-from fastapi import Form, Depends, Path as PathParam
+from fastapi import Depends, Path as PathParam, Form
 from fastapi.routing import APIRouter
 from api.order.requests.create_order_request import CreateOrderRequest
 from api.order.requests.update_order import UpdateOrderRequest
@@ -7,6 +7,8 @@ from api.schemas.response import ApiResponse
 from models.base.enums import CancellationReason, DeliverStatus, Status
 from fastapi.security import HTTPBearer
 from fastapi import UploadFile
+
+# from fastapi import UploadFile
 from models.order import Order
 
 from utils.jwt import JWTBearer
@@ -73,23 +75,23 @@ async def cancel_order(
     )
 
 
-@router.put("/{shortname}/assign")
-async def assign_order(
-    shortname: Annotated[
-        str, PathParam(examples=["b775fdbe"], description="Order shortname")
-    ],
-    _=Depends(JWTBearer()),
-):
-    order: Order = await Order.get_or_fail(shortname)
-
-    await order.progress("assign")
-    await order.refresh()
-
-    return ApiResponse(
-        status=Status.success,
-        message="Order assigned successfully",
-        data={"order": order.represent()},
-    )
+# @router.put("/{shortname}/assign")
+# async def assign_order(
+#     shortname: Annotated[
+#         str, PathParam(examples=["b775fdbe"], description="Order shortname")
+#     ],
+#     _=Depends(JWTBearer()),
+# ):
+#     order: Order = await Order.get_or_fail(shortname)
+#
+#     await order.progress("assign")
+#     await order.refresh()
+#
+#     return ApiResponse(
+#         status=Status.success,
+#         message="Order assigned successfully",
+#         data={"order": order.represent()},
+#     )
 
 
 @router.put("/{shortname}/update")
