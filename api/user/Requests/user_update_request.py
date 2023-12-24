@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ValidationInfo, field_validator
+from pydantic import BaseModel, Field
 from models.enums import Language, OperatingSystems
 from utils import regex
 

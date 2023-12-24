@@ -1,5 +1,5 @@
 from pydantic import BaseModel,Field
-from models.enums import DeliverStatus, Language, StrEnum
+from models.enums import DeliverStatus, Language
 from utils import regex
 
 class DeliverLocation(BaseModel):
