@@ -146,7 +146,7 @@ async def upload_attachment(
 
     attached: bool = False
     if file.file and file.filename and file.content_type:
-        attached: bool = await order.attach(
+        attached = await order.attach(
             payload=file.file,
             payload_file_name=file.filename,
             payload_mime_type=file.content_type,

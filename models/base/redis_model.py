@@ -21,18 +21,18 @@ class RedisModel(BaseModel):
 
     async def store(self) -> None:
         async with RedisServices() as redis:
-            return await redis.set(
+            await redis.set(
                 key=self.get_key(), value=self.get_value(), ex=self.get_expiry()
             )
 
-    async def get_and_del(self) -> str | None:
+    async def get_and_del(self) -> Any:
         async with RedisServices() as redis:
             return await redis.getdel(key=self.get_key())
 
-    async def get(self) -> str | None:
+    async def get(self) -> Any:
         async with RedisServices() as redis:
             return await redis.get(key=self.get_key())
 
     async def delete(self) -> None:
         async with RedisServices() as redis:
-            return await redis.delete(key=self.get_key())
+            await redis.delete(key=self.get_key())

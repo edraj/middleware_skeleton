@@ -8,7 +8,7 @@ from cryptography.fernet import Fernet
 from utils.settings import settings
 
 
-def clean_dict(dict_with_nones: typing.Any) -> dict[str, typing.Any]:
+def clean_dict(dict_with_nones: typing.Any) -> typing.Any:
     if not isinstance(dict_with_nones, dict):
         return dict_with_nones
 
@@ -63,11 +63,10 @@ class MainResponse(JSONResponse):
             logger.error("Error", extra={"props": {"message": str(e)}})
 
     def render(self, content: typing.Any) -> bytes:
+        data: dict[str, typing.Any] = {}
         try:
-            data: dict[str, typing.Any] = (
-                content if isinstance(content, dict) else json.loads(content)
-            )
+            data = content if isinstance(content, dict) else json.loads(content)
         except ValueError:
-            data: dict[str, typing.Any] = {"error": content}
+            data = {"error": content}
 
         return json.dumps(clean_dict(data), indent=2).encode("utf-8")

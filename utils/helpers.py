@@ -11,14 +11,14 @@ def snake_case(camel_str: str) -> str:
 
 
 def escape_for_redis(s: str) -> str:
-    return s.translate(
-        str.maketrans(
-            {".": r"\.", "@": r"\@", ":": r"\:", "/": r"\/", "-": r"\-", " ": r"\ "}
-        )
+    table: dict[int, str] = str.maketrans(
+        {".": r"\.", "@": r"\@", ":": r"\:", "/": r"\/", "-": r"\-", " ": r"\ "}
     )
+    return s.translate(table)
 
 
 def special_to_underscore(s: str) -> str:
-    return s.translate(
-        str.maketrans({".": "_", "@": "_", ":": "_", "/": "_", "-": "_", " ": "_"})
+    table: dict[int, str] = str.maketrans(
+        {".": "_", "@": "_", ":": "_", "/": "_", "-": "_", " ": "_"}
     )
+    return s.translate(table)

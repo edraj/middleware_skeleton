@@ -15,7 +15,7 @@ async def get_otps(identifier: str) -> list[str]:
         escaped: str = special_to_underscore(identifier)
         res = await redis.get_keys(f"{escaped}:*")
         print(f"\n\n {escaped = } \n {res = } \n\n")
-        return res
+        return list(res)
 
 
 def assert_code_and_status_success(response: Response) -> None:
