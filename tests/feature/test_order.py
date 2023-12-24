@@ -1,4 +1,3 @@
-from httpx import Response
 import pytest
 from models.base.enums import CancellationReason
 from tests.base_test import assert_code_and_status_success, client
