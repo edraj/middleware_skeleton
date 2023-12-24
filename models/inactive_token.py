@@ -1,4 +1,4 @@
-from models.redis_model import RedisModel
+from models.base.redis_model import RedisModel
 from datetime import datetime
 from utils.settings import settings
 

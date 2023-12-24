@@ -1,10 +1,13 @@
+from io import BytesIO
+import json
 import aiohttp
-from models.enums import ResourceType, Space
+from models.base.enums import CancellationReason, ResourceType, Space
 from utils.settings import settings
 from enum import Enum
-from typing import Any
+from typing import Any, BinaryIO
 from fastapi import status
 from api.schemas.response import ApiException, Error
+from fastapi.logger import logger
 
 
 class RequestType(str, Enum):
@@ -25,9 +28,16 @@ class RequestMethod(str, Enum):
 class DMart:
     auth_token = ""
 
-    def get_headers(self):
+    @property
+    def json_headers(self) -> dict[str, str]:
         return {
             "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.auth_token}",
+        }
+
+    @property
+    def headers(self) -> dict[str, str]:
+        return {
             "Authorization": f"Bearer {self.auth_token}",
         }
 
@@ -40,7 +50,7 @@ class DMart:
             url = f"{settings.dmart_url}/user/login"
             response = await session.post(
                 url,
-                headers=self.get_headers(),
+                headers=self.json_headers,
                 json=json,
             )
             resp_json = await response.json()
@@ -52,39 +62,43 @@ class DMart:
 
             self.auth_token = resp_json["records"][0]["attributes"]["access_token"]
 
-    async def __api(self, endpoint, method: RequestMethod, json=None) -> dict:
-        resp_json = {}
+    async def __api(
+        self,
+        endpoint: str,
+        method: RequestMethod,
+        json: dict[str, Any] | None = None,
+        data: aiohttp.FormData | None = None,
+    ) -> dict[str, Any]:
+        if not self.auth_token:
+            await self.login()
+
+        resp_json: dict[str, Any] = {}
         response: aiohttp.ClientResponse | None = None
-        for _ in range(3):
-            url = f"{settings.dmart_url}{endpoint}"
-            try:
-                async with aiohttp.ClientSession() as session:
-                    response = await getattr(session, method.value)(
-                        url, headers=self.get_headers(), json=json
-                    )
-                    # if json:
-                    #     response = await session.post(
-                    #         url, headers=self.get_headers(), json=json
-                    #     )
-                    # else:
-                    #     response = await session.get(url, headers=self.get_headers())
+        try:
+            async with aiohttp.ClientSession() as session:
+                response = await session.request(
+                    method.value,
+                    f"{settings.dmart_url}{endpoint}",
+                    headers=self.json_headers if json else self.headers,
+                    json=json if not data else None,
+                    data=data if data else None,
+                )
+                resp_json = await response.json()
 
-                    resp_json = await response.json()
-
-                if (
-                    resp_json
-                    and resp_json.get("status", None) == "failed"
-                    and resp_json.get("error", {}).get("type", None) == "jwtauth"
-                ):
-                    await self.login()
-                    raise ConnectionError()
-
-                break
-            except ConnectionError:
-                continue
+        except ConnectionError as e:
+            logger.warn(
+                "Failed request to Dmart core",
+                {
+                    "endpoint": endpoint,
+                    "method": method,
+                    "json": json,
+                    "data": data,
+                    "error": e.args,
+                },
+            )
 
         if response is None or response.status != 200:
-            message = resp_json.get("error", {}).get("message", {})
+            message: str = resp_json.get("error", {}).get("message", "")
             raise ApiException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 error=Error(
@@ -100,12 +114,12 @@ class DMart:
     async def __request(
         self,
         space_name: Space,
-        subpath,
-        shortname,
+        subpath: str,
+        shortname: str,
         request_type: RequestType,
         attributes: dict[str, Any] = {},
         resource_type: ResourceType = ResourceType.content,
-    ) -> dict:
+    ) -> dict[str, Any]:
         return await self.__api(
             "/managed/request",
             RequestMethod.post,
@@ -127,11 +141,48 @@ class DMart:
         self,
         space_name: Space,
         subpath: str,
-        attributes: dict,
+        attributes: dict[str, Any],
         shortname: str = "auto",
-    ) -> dict:
+        resource_type: ResourceType = ResourceType.content,
+    ) -> dict[str, Any]:
         return await self.__request(
-            space_name, subpath, shortname, RequestType.create, attributes
+            space_name,
+            subpath,
+            shortname,
+            RequestType.create,
+            attributes,
+            resource_type,
+        )
+
+    async def upload_resource_with_payload(
+        self,
+        space_name: Space,
+        record: dict[str, Any],
+        payload: BinaryIO,
+        payload_file_name: str,
+        payload_mime_type: str,
+    ):
+        record_file = BytesIO(bytes(json.dumps(record), "utf-8"))
+
+        data = aiohttp.FormData()
+        data.add_field(
+            "request_record",
+            record_file,
+            filename="record.json",
+            content_type="application/json",
+        )
+        data.add_field(
+            "payload_file",
+            payload,
+            filename=payload_file_name,
+            content_type=payload_mime_type,
+        )
+        data.add_field("space_name", space_name)
+
+        return await self.__api(
+            endpoint="/managed/resource_with_payload",
+            method=RequestMethod.post,
+            data=data,
         )
 
     async def read(
@@ -140,16 +191,19 @@ class DMart:
         subpath: str,
         shortname: str,
         retrieve_attachments: bool = False,
-    ) -> dict:
+        resource_type: ResourceType = ResourceType.content,
+    ) -> dict[str, Any]:
         return await self.__api(
             (
-                f"/managed/entry/content/{space_name}/{subpath}/{shortname}"
+                f"/managed/entry/{resource_type}/{space_name}/{subpath}/{shortname}"
                 f"?retrieve_json_payload=true&retrieve_attachments={retrieve_attachments}"
             ),
             RequestMethod.get,
         )
 
-    async def read_json_payload(self, space_name: Space, subpath, shortname) -> dict:
+    async def read_json_payload(
+        self, space_name: Space, subpath: str, shortname: str
+    ) -> dict[str, Any]:
         return await self.__api(
             f"/managed/payload/content/{space_name}/{subpath}/{shortname}.json",
             RequestMethod.get,
@@ -160,9 +214,9 @@ class DMart:
         space_name: Space,
         subpath: str,
         search: str = "",
-        filter_schema_names=[],
-        **kwargs,
-    ) -> dict:
+        filter_schema_names: list[str] = [],
+        **kwargs: Any,
+    ) -> dict[str, Any]:
         return await self.__api(
             "/managed/query",
             RequestMethod.post,
@@ -178,14 +232,47 @@ class DMart:
         )
 
     async def update(
-        self, space_name: Space, subpath, shortname, attributes: dict
-    ) -> dict:
+        self,
+        space_name: Space,
+        subpath: str,
+        shortname: str,
+        attributes: dict[str, Any],
+        resource_type: ResourceType = ResourceType.content,
+    ) -> dict[str, Any]:
         return await self.__request(
-            space_name, subpath, shortname, RequestType.update, attributes
+            space_name,
+            subpath,
+            shortname,
+            RequestType.update,
+            attributes,
+            resource_type,
         )
 
-    async def delete(self, space_name: Space, subpath, shortname, resource_type: ResourceType = ResourceType.content) -> dict:
-        json = {
+    async def progress_ticket(
+        self,
+        space_name: Space,
+        subpath: str,
+        shortname: str,
+        action: str,
+        cancellation_reasons: CancellationReason | None = None,
+    ) -> dict[str, Any]:
+        request_body = None
+        if cancellation_reasons:
+            request_body = {"resolution": cancellation_reasons}
+        return await self.__api(
+            (f"/managed/progress-ticket/{space_name}/{subpath}/{shortname}/{action}"),
+            RequestMethod.put,
+            json=request_body,
+        )
+
+    async def delete(
+        self,
+        space_name: Space,
+        subpath: str,
+        shortname: str,
+        resource_type: ResourceType = ResourceType.content,
+    ) -> dict[str, Any]:
+        json: dict[str, Any] = {
             "space_name": space_name,
             "request_type": RequestType.delete,
             "records": [

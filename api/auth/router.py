@@ -1,6 +1,9 @@
 import random
-from typing import Annotated
-from fastapi import APIRouter, Body, Depends, Query, Request
+from typing import Annotated, Any
+from venv import logger
+import aiohttp
+from fastapi import APIRouter, Body, Depends, Request, Response
+from api.auth.Requests.otp_request import OTPRequest
 from api.auth.Requests.login_request import LoginRequest
 from api.auth.Requests.register_request import RegisterRequest
 from api.auth.Requests.reset_password_request import ResetPasswordRequest
@@ -14,176 +17,81 @@ from services.sms_sender import SMSSender
 from mail.user_reset_password import UserResetPassword
 from mail.user_verification import UserVerification
 from models.user import User
-from models.enums import OTPFor, Status
+from models.base.enums import OTPFor, Status
 from models.otp import Otp
-from utils.helpers import escape_for_redis
+from utils.helpers import escape_for_redis, special_to_underscore
 from utils.jwt import JWTBearer, sign_jwt
 from utils.password_hashing import hash_password, verify_password
 from utils.settings import settings
+from fastapi_sso.sso.base import OpenID
 from fastapi_sso.sso.google import GoogleSSO
 from fastapi_sso.sso.facebook import FacebookSSO
 from fastapi_sso.sso.github import GithubSSO
 from fastapi_sso.sso.microsoft import MicrosoftSSO
+from fastapi_sso.sso.base import SSOBase
 
 router = APIRouter()
 
 
+@router.post("/otp-request", response_model_exclude_none=True)
+async def otp_request(request: OTPRequest):
+    if request.email:
+        otp = Otp(
+            user_shortname=special_to_underscore(request.email),
+            otp_for=OTPFor.mail_verification,
+            otp=f"{random.randint(111111, 999999)}",
+        )
+        await otp.store()
+
+        await UserVerification.send(request.email, otp.otp)
+
+    if request.mobile:
+        otp = Otp(
+            user_shortname=request.mobile,
+            otp_for=OTPFor.mobile_verification,
+            otp=f"{random.randint(111111, 999999)}",
+        )
+        await otp.store()
+
+        await SMSSender.send(request.mobile, otp.otp)
+
+    return ApiResponse(status=Status.success, message="OTP sent successfully")
+
+
 @router.post("/register", response_model_exclude_none=True)
 async def register(request: RegisterRequest):
+    is_valid_otp = await Otp.validate_otps(request.model_dump())
+
+    if not is_valid_otp:
+        raise ApiException(
+            status_code=404,
+            error=Error(type="Invalid request", code=307, message="Invalid OTP"),
+        )
+
     user_model = User(
-        **request.model_dump(exclude=["password_confirmation"], exclude_none=True)
+        **request.model_dump(
+            exclude={"password_confirmation", "email_otp", "mobile_otp"},
+            exclude_none=True,
+        ),
     )
+
+    if request.email:
+        user_model.is_email_verified = True
+
+    if request.mobile:
+        user_model.is_mobile_verified = True
 
     await user_model.store()
 
     return ApiResponse(
         status=Status.success,
-        message="Account created successfully, please check your mail for the verification code",
+        message="Account created successfully",
         data=user_model.represent(),
     )
 
 
-@router.post("/verify-email", response_model_exclude_none=True)
-async def verify_email(
-    email: Annotated[str, Body(examples=["myname@email.com"])],
-    otp: Annotated[str, Body(examples=["123456"])],
-):
-    user: User | None = await User.find(f"@full_email:{{{escape_for_redis(email)}}}")
-
-    if not user:
-        raise ApiException(
-            status_code=404,
-            error=Error(type="db", code=12, message="User not found"),
-        )
-
-    if user.is_email_verified:
-        raise ApiException(
-            status_code=400,
-            error=Error(
-                type="db",
-                code=12,
-                message="User's email has already been verified, please go to login",
-            ),
-        )
-
-    otp_model = Otp(
-        user_shortname=user.shortname, otp=otp, otp_for=OTPFor.mail_verification
-    )
-    otp_exists = await otp_model.get_and_del()
-
-    if not otp_exists:
-        return ApiResponse(
-            status=Status.failed,
-            error=Error(type="Invalid request", code=307, message="Invalid OTP"),
-        )
-
-    user.is_email_verified = True
-    await user.sync()
-
-    return ApiResponse(status=Status.success, message="Email verified successfully")
-
-
-@router.post("/verify-mobile", response_model_exclude_none=True)
-async def verify_mobile(
-    mobile: Annotated[str, Body(examples=["7999228903"])],
-    otp: Annotated[str, Body(examples=["123456"])],
-):
-    user: User | None = await User.find(f"@mobile:{mobile}")
-
-    if not user:
-        raise ApiException(
-            status_code=404,
-            error=Error(type="db", code=12, message="User not found"),
-        )
-
-    if user.is_mobile_verified:
-        raise ApiException(
-            status_code=400,
-            error=Error(
-                type="db",
-                code=12,
-                message="User's mobile has already been verified, please go to login",
-            ),
-        )
-
-    otp_model = Otp(
-        user_shortname=user.shortname, otp=otp, otp_for=OTPFor.mobile_verification
-    )
-    otp_exists = await otp_model.get_and_del()
-
-    if not otp_exists:
-        return ApiResponse(
-            status=Status.failed,
-            error=Error(type="Invalid request", code=307, message="Invalid OTP"),
-        )
-
-    user.is_mobile_verified = True
-    await user.sync()
-
-    return ApiResponse(status=Status.success, message="mobile verified successfully")
-
-
-@router.get("/resend-verification-email", response_model_exclude_none=True)
-async def resend_verification_email(
-    email: Annotated[str, Query(examples=["myname@email.com"])]
-):
-    user: User | None = await User.find(f"@full_email:{{{escape_for_redis(email)}}}")
-
-    if not user or user.is_email_verified:
-        raise ApiException(
-            status_code=404,
-            error=Error(
-                type="db", code=33, message="User not found or already verified"
-            ),
-        )
-
-    otp = Otp(
-        user_shortname=user.shortname,
-        otp_for=OTPFor.mail_verification,
-        otp=f"{random.randint(111111, 999999)}",
-    )
-    await otp.store()
-
-    await UserVerification.send(user.email, otp.otp)
-
-    return ApiResponse(status=Status.success, message="Email sent successfully")
-
-
-@router.get("/resend-verification-sms", response_model_exclude_none=True)
-async def resend_verification_sms(
-    mobile: Annotated[str, Query(examples=["7999228903"])]
-):
-    user: User | None = await User.find(f"@mobile:{mobile}")
-
-    if not user or user.is_mobile_verified:
-        raise ApiException(
-            status_code=404,
-            error=Error(
-                type="db", code=33, message="User not found or already verified"
-            ),
-        )
-
-    otp = Otp(
-        user_shortname=user.shortname,
-        otp_for=OTPFor.mobile_verification,
-        otp=f"{random.randint(111111, 999999)}",
-    )
-    await otp.store()
-
-    await SMSSender.send(user.mobile, otp.otp)
-
-    return ApiResponse(status=Status.success, message="SMS sent successfully")
-
-
 @router.post("/login", response_model_exclude_none=True)
-async def login(request: LoginRequest):
-    if not request.email and not request.mobile:
-        raise ApiException(
-            status_code=401,
-            error=Error(
-                type="auth", code=14, message="Please provide email or mobile number"
-            ),
-        )
+async def login(response: Response, request: LoginRequest):
     user: User | None = await User.find(
         f"@full_email:{{{escape_for_redis(request.email)}}}"
         if request.email
@@ -196,14 +104,37 @@ async def login(request: LoginRequest):
             (request.email and not user.is_email_verified)
             or (request.mobile and not user.is_mobile_verified)
         )
-        or not verify_password(request.password, user.password)
+        or (
+            request.password
+            and user.password
+            and not verify_password(request.password, user.password)
+        )
     ):
         raise ApiException(
             status_code=401,
             error=Error(type="auth", code=14, message="Invalid Credentials"),
         )
 
+    if not request.password:
+        is_valid_otp: bool = await Otp.validate_otps(
+            request.model_dump(exclude_none=True)
+        )
+        if not is_valid_otp:
+            raise ApiException(
+                status_code=401,
+                error=Error(type="auth", code=14, message="Invalid OTP"),
+            )
+
     access_token = sign_jwt({"username": user.shortname}, settings.jwt_access_expires)
+
+    response.set_cookie(
+        value=access_token,
+        max_age=settings.jwt_access_expires,
+        key="auth_token",
+        httponly=True,
+        secure=True,
+        samesite="none",
+    )
 
     return ApiResponse(
         status=Status.success,
@@ -291,30 +222,12 @@ async def reset_password(request: ResetPasswordRequest):
     return ApiResponse(status=Status.success, message="Password updated successfully")
 
 
-@router.get("/google/login")
-async def google_login(google_sso: GoogleSSO = Depends(get_google_sso)):
-    return await google_sso.get_login_redirect()
-
-
-@router.get("/google/callback")
-async def google_callback(
-    request: Request, google_sso: GoogleSSO = Depends(get_google_sso)
+@router.post("/google/login")
+async def google_profile(
+    access_token: Annotated[str, Body()],
+    google_sso: GoogleSSO = Depends(get_google_sso),
 ):
-    user = await google_sso.verify_and_process(request)
-    user_model: User | None = await User.find(search=f"@google_id:{user.id}")
-
-    if not user_model:
-        user_model = User(
-            google_id=user.id,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            email=user.email,
-            is_email_verified=True,
-            profile_pic_url=user.picture,
-            password="GoogleAuthorized@dmart#2024",
-        )
-
-        await user_model.store(trigger_events=False)
+    user_model = await social_login(access_token, google_sso, "google")
 
     access_token = sign_jwt(
         {"username": user_model.shortname}, settings.jwt_access_expires
@@ -330,30 +243,12 @@ async def google_callback(
     )
 
 
-@router.get("/facebook/login")
-async def facebook_login(facebook_sso: FacebookSSO = Depends(get_facebook_sso)):
-    return await facebook_sso.get_login_redirect()
-
-
-@router.get("/facebook/callback")
-async def facebook_callback(
-    request: Request, facebook_sso: FacebookSSO = Depends(get_facebook_sso)
+@router.post("/facebook/login")
+async def facebook_login(
+    access_token: Annotated[str, Body()],
+    facebook_sso: FacebookSSO = Depends(get_facebook_sso),
 ):
-    user = await facebook_sso.verify_and_process(request)
-    user_model: User | None = await User.find(search=f"@facebook_id:{user.id}")
-
-    if not user_model:
-        user_model = User(
-            facebook_id=user.id,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            email=user.email,
-            is_email_verified=True,
-            profile_pic_url=user.picture,
-            password="FacebookAuthorized@dmart#2024",
-        )
-
-        await user_model.store(trigger_events=False)
+    user_model = await social_login(access_token, facebook_sso, "facebook")
 
     access_token = sign_jwt(
         {"username": user_model.shortname}, settings.jwt_access_expires
@@ -370,29 +265,11 @@ async def facebook_callback(
 
 
 @router.get("/github/login")
-async def github_login(github_sso: GithubSSO = Depends(get_github_sso)):
-    return await github_sso.get_login_redirect()
-
-
-@router.get("/github/callback")
-async def github_callback(
-    request: Request, github_sso: GithubSSO = Depends(get_github_sso)
+async def github_login(
+    access_token: Annotated[str, Body()],
+    github_sso: GithubSSO = Depends(get_github_sso),
 ):
-    user = await github_sso.verify_and_process(request)
-    user_model: User | None = await User.find(search=f"@github_id:{user.id}")
-
-    if not user_model:
-        user_model = User(
-            github_id=user.id,
-            first_name=user.display_name,
-            last_name="",
-            email=user.email,
-            is_email_verified=True,
-            profile_pic_url=user.picture,
-            password="GithubAuthorized@dmart#2024",
-        )
-
-        await user_model.store(trigger_events=False)
+    user_model = await social_login(access_token, github_sso, "github")
 
     access_token = sign_jwt(
         {"username": user_model.shortname}, settings.jwt_access_expires
@@ -409,29 +286,11 @@ async def github_callback(
 
 
 @router.get("/microsoft/login")
-async def microsoft_login(microsoft_sso: MicrosoftSSO = Depends(get_microsoft_sso)):
-    return await microsoft_sso.get_login_redirect()
-
-
-@router.get("/microsoft/callback")
-async def microsoft_callback(
-    request: Request, microsoft_sso: MicrosoftSSO = Depends(get_microsoft_sso)
+async def microsoft_login(
+    access_token: Annotated[str, Body()],
+    microsoft_sso: MicrosoftSSO = Depends(get_microsoft_sso),
 ):
-    user = await microsoft_sso.verify_and_process(request)
-    user_model: User | None = await User.find(search=f"@microsoft_id:{user.id}")
-
-    if not user_model:
-        user_model = User(
-            microsoft_id=user.id,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            email=user.email,
-            is_email_verified=True,
-            profile_pic_url=user.picture,
-            password="MicrosoftAuthorized@dmart#2024",
-        )
-
-        await user_model.store(trigger_events=False)
+    user_model = await social_login(access_token, microsoft_sso, "microsoft")
 
     access_token = sign_jwt(
         {"username": user_model.shortname}, settings.jwt_access_expires
@@ -447,24 +306,80 @@ async def microsoft_callback(
     )
 
 
-@router.post("/logout")
-async def logout(request: Request, shortname=Depends(JWTBearer())):
-    user: User | None = await User.get(shortname)
+async def social_login(access_token: str, sso: SSOBase, provider: str) -> User:
+    async with aiohttp.ClientSession() as session:
+        user_profile_endpoint: str | None = await sso.userinfo_endpoint
+        response = None
+        if user_profile_endpoint:
+            response = await session.get(
+                user_profile_endpoint,
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+        if not response or response.status != 200:
+            raise ApiException(
+                status_code=400,
+                error=Error(type="data", code=12, message="Invalid access token"),
+            )
 
-    if not user:
-        raise ApiException(
-            status_code=404,
-            error=Error(type="db", code=12, message="User not found"),
-        )
+        content: dict[str, Any] = await response.json()
+        provider_user: OpenID = await sso.openid_from_response(content)  # type: ignore
+
+    user_model: User | None = await User.find(
+        search=f"@{provider}_id:{provider_user.id}"
+    )
+
+    if not user_model:
+        try:
+            user_model = User(
+                **provider_user.model_dump(include={"first_name", "last_name", "email"})
+            )
+            user_model.is_email_verified = True
+            setattr(user_model, f"{provider}_id", provider_user.id)
+
+        except Exception as e:
+            logger.error(
+                "Invalid SSO provider data",
+                {
+                    "provider": provider,
+                    "user_profile_endpoint": user_profile_endpoint,
+                    "response": content,
+                    "provider_user": provider_user,
+                    "error": e.args,
+                },
+            )
+            raise ApiException(
+                status_code=400,
+                error=Error(type="data", code=12, message="Invalid provider data"),
+            )
+
+        await user_model.store(trigger_events=False)
+
+    return user_model
+
+
+@router.post("/logout")
+async def logout(
+    response: Response, request: Request, shortname: str = Depends(JWTBearer())
+):
+    user: User = await User.get_or_fail(shortname)
 
     if user.firebase_token:
         user.firebase_token = None
-        user.sync()
+        await user.sync()
 
     decoded_data = await JWTBearer().extract_and_decode(request)
     inactive_token = InactiveToken(
-        token=decoded_data.get("token"), expires=str(decoded_data.get("expires"))
+        token=decoded_data.get("token", ""), expires=str(decoded_data.get("expires"))
     )
     await inactive_token.store()
+
+    response.set_cookie(
+        value="",
+        max_age=0,
+        key="auth_token",
+        httponly=True,
+        secure=True,
+        samesite="none",
+    )
 
     return ApiResponse(status=Status.success, message="Logged out successfully")

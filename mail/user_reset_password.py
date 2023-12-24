@@ -5,7 +5,7 @@ from utils.mailer import mailer
 
 class UserResetPassword:
     @staticmethod
-    async def send(email: str, otp):
+    async def send(email: str, otp: str) -> None:
         html = f"""
         <p>Use this code to reset your password {otp}</p> 
         """

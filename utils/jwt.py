@@ -18,7 +18,7 @@ async def decode_jwt(token: str) -> dict[str, Any]:
             Error(type="jwtauth", code=12, message="Invalid Token [1]"),
         )
 
-    decoded_token: dict
+    decoded_token: dict[str, Any]
     try:
         decoded_token = jwt.decode(
             token, settings.jwt_secret, algorithms=[settings.jwt_algorithm]
@@ -77,12 +77,13 @@ class JWTBearer(HTTPBearer):
 
         return user_shortname
 
-    async def extract_and_decode(cls, request) -> dict:
-        token = request.headers.get("Authorization") or request.cookies.get(
-            "auth_token"
+    @classmethod
+    async def extract_and_decode(cls, request: Request) -> dict[str, Any]:
+        token: str = request.headers.get("Authorization") or request.cookies.get(
+            "auth_token", ""
         )
         token = token.split("Bearer ")[-1]
-        decoded = await decode_jwt(token)
+        decoded: dict[str, Any] = await decode_jwt(token)
         decoded["token"] = token
         return decoded
 
@@ -102,6 +103,6 @@ class GetJWTToken(HTTPBearer):
             return request.cookies.get("auth_token")
 
 
-def sign_jwt(data: dict, expires: int = settings.access_token_expire) -> str:
+def sign_jwt(data: dict[str, Any], expires: int = settings.access_token_expire) -> str:
     payload = {"data": data, "expires": time() + expires}
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
