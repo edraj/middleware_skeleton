@@ -1,5 +1,5 @@
 from api.schemas.response import ApiException, Error
-from typing import Any, BinaryIO, Optional, TypeVar
+from typing import Any, BinaryIO, Optional, Self, Type, TypeVar
 from fastapi.logger import logger
 from pydantic import BaseModel, Field
 
@@ -93,7 +93,7 @@ class JsonModel(BaseModel):
     @classmethod
     def payload_to_model(
         cls, attributes: dict[str, Any], shortname: str
-    ) -> Optional["JsonModel"]:
+    ) -> Optional[Self]:
         try:
             payload_body_attributes = cls.payload_body_attributes()
             class_attributes = cls.class_attributes()
@@ -105,7 +105,7 @@ class JsonModel(BaseModel):
                 if key in payload_body_attributes:
                     model_fields[key] = value
 
-            class_model = cls(**model_fields)
+            class_model: Self = cls(**model_fields)
             class_model.shortname = shortname
             return class_model
         except Exception as e:
@@ -115,7 +115,7 @@ class JsonModel(BaseModel):
             return None
 
     @classmethod
-    async def get(cls: type[TJsonModel], shortname: str) -> TJsonModel | None:
+    async def get(cls: Type[TJsonModel], shortname: str) -> TJsonModel | None:
         model_name = snake_case(cls.__name__)
         try:
             data: dict[str, Any] = await dmart.read(

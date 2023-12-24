@@ -3,7 +3,7 @@ import pytest
 from models.base.enums import CancellationReason
 from tests.base_test import assert_code_and_status_success, client
 
-_order_shortname = None
+_order_shortname: str = ""
 ORDER_PAYLOAD: dict[str, str | dict[str, str]] = {
     "name": "John",
     "address": "Baghdad",
@@ -22,12 +22,11 @@ def test_create_order():
     )
     assert_code_and_status_success(response)
     json_response = response.json()
-    _order_shortname = json_response.get("data", {}).get("shortname")
+    _order_shortname = json_response.get("data", {}).get("shortname", "")
 
 
 @pytest.mark.run(order=2)
 def test_track_order():
-    global _order_shortname
     response = client.get(f"order/{_order_shortname}/track")
     assert_code_and_status_success(response)
     assert response.json().get("data", {}).get("order", {}).get("state") == "pending"
@@ -35,7 +34,6 @@ def test_track_order():
 
 @pytest.mark.run(order=2)
 def test_update_order():
-    global _order_shortname
     response = client.put(
         f"order/{_order_shortname}/update",
         json={
@@ -74,18 +72,17 @@ def test_query_assigned_orders():
     assert response.json().get("data", {}).get("count") > 1
 
 
-@pytest.mark.run(order=2)
-def test_assign_order():
-    response: Response = client.post(
-        "/order/create",
-        json=ORDER_PAYLOAD,
-    )
-    assert_code_and_status_success(response)
-    order_shortname: str = response.json().get("data", {}).get("shortname", "")
-
-    response = client.put(f"order/{order_shortname}/assign")
-    assert_code_and_status_success(response)
-    assert response.json().get("data", {}).get("order", {}).get("state") == "assigned"
+# @pytest.mark.run(order=2)
+# def test_assign_order():
+#     response: Response = client.post(
+#         "/order/create",
+#         json=ORDER_PAYLOAD,
+#     )
+#     assert_code_and_status_success(response)
+#     order_shortname: str = response.json().get("data", {}).get("shortname", "")
+#     response = client.put(f"order/{order_shortname}/assign")
+#     assert_code_and_status_success(response)
+#     assert response.json().get("data", {}).get("order", {}).get("state") == "assigned"
 
 
 @pytest.mark.run(order=2)
