@@ -66,3 +66,8 @@ class DeliverStatus(StrEnum):
     assigned = "assigned"
     failed = "failed"
     delivered = "delivered"
+
+
+class DeliveryMethod(StrEnum):
+    store_pickup = "store_pickup"
+    home = "home"

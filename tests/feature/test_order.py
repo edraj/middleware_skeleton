@@ -1,14 +1,29 @@
+from typing import Any
 import pytest
 from models.base.enums import CancellationReason
+from models.order import Order
 from tests.base_test import assert_code_and_status_success, client
 
 _order_shortname: str = ""
-ORDER_PAYLOAD: dict[str, str | dict[str, str]] = {
+ORDER_PAYLOAD: dict[str, Any] = {
     "name": "John",
-    "address": "Baghdad",
-    "mobile": "2355806229",
-    "location": {"latitude": "33.3152° N", "longitude": "44.3661° E"},
+    "number": "9002213",
+    "address": {
+        "city": "Cairo",
+        "governorate_shortname": "Heliopolis",
+        "district_shortname": "D3",
+        "street": "Ali Basha",
+        "building": "Tarra",
+        "apartment": "33",
+        "location": {"latitude": "33.3152° N", "longitude": "44.3661° E"},
+    },
+    "store_shortname": "oPhone",
+    "plan_shortname": "VIP",
+    "mobile": "6852734970",
+    "addons": ["one", "two"],
+    "high4": True,
     "language": "en",
+    "state": "pending",
 }
 
 
@@ -36,9 +51,21 @@ def test_update_order():
     response = client.put(
         f"order/{_order_shortname}/update",
         json={
-            "tracking_id": "2390849311212",
-            "planned_delivery_date": "2023-12-13T21:06:25.242772",
-            "scheduled_delivery": "2023-12-13T21:06:25.242791",
+            "tracking_id": "2342111",
+            "planned_delivery_date": "2023-12-25T13:33:19.583105",
+            "scheduled_delivery": "2023-12-25T13:33:19.583133",
+            "delivery": {
+                "address": {
+                    "apartment": "33",
+                    "building": "Tarra",
+                    "city": "Cairo",
+                    "district_shortname": "D3",
+                    "governorate_shortname": "Heliopolis",
+                    "location": {"latitude": "33.3152° N", "longitude": "44.3661° E"},
+                    "street": "Ali Basha",
+                },
+                "method": "store_pickup",
+            },
             "state": "assigned",
         },
     )
@@ -68,7 +95,13 @@ def test_attach_to_order():
 def test_query_assigned_orders():
     response = client.post("/order/query?order_status=assigned")
     assert_code_and_status_success(response)
-    assert response.json().get("data", {}).get("count") > 1
+    assert response.json().get("data", {}).get("count") == 1
+
+
+@pytest.mark.run(order=2)
+@pytest.mark.asyncio
+async def test_delete_order():
+    await delete_order(_order_shortname)
 
 
 # @pytest.mark.run(order=2)
@@ -85,7 +118,8 @@ def test_query_assigned_orders():
 
 
 @pytest.mark.run(order=2)
-def test_cancel_order():
+@pytest.mark.asyncio
+async def test_cancel_order():
     response = client.post(
         "/order/create",
         json=ORDER_PAYLOAD,
@@ -102,3 +136,10 @@ def test_cancel_order():
         response.json().get("data", {}).get("order", {}).get("resolution_reason")
         == CancellationReason.ordered_by_mistake
     )
+    await delete_order(order_shortname)
+
+
+async def delete_order(shortname: str):
+    order = await Order.get(shortname)
+    assert order
+    await order.delete()

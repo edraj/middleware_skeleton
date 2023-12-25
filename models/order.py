@@ -1,41 +1,66 @@
 from typing import Any
 from pydantic import Field, BaseModel
-from models.base.enums import DeliverStatus, Language
+from models.base.enums import DeliverStatus, DeliveryMethod, Language
 from models.base.ticket_model import TicketModel
 from utils import regex
 
 
-class DeliverLocation(BaseModel):
-    latitude: str = Field(default=None, examples=["33.3152° N"])
-    longitude: str = Field(default=None, examples=["44.3661° E"])
+class Location(BaseModel):
+    latitude: str | None = None
+    longitude: str | None = None
+
+
+class Address(BaseModel):
+    city: str
+    governorate_shortname: str
+    district_shortname: str
+    building: str
+    apartment: str
+    street: str
+    location: Location | None = None
+
+
+class Delivery(BaseModel):
+    method: DeliveryMethod
+    address: Address
 
 
 class Order(TicketModel):
-    name: str = Field(default=None)
-    address: str = Field(default=None)
+    name: str | None = None
+    number: str | None = None
+    address: Address | None = None
+    store_shortname: str | None = None
+    plan_shortname: str | None = None
     mobile: str = Field(default=None, pattern=regex.MSISDN)
     tracking_id: str | None = None
-    location: DeliverLocation = Field()
+    addons: list[str] | None = None
+    high4: bool | None = None
     language: Language = Field(default=Language.en)
-    state: DeliverStatus = Field(default=DeliverStatus.pending)
     planned_delivery_date: str | None = None
     scheduled_delivery: str | None = None
+    delivery: Delivery | None = None
+    iccid: str = "8858774455555"
+    state: DeliverStatus = Field(default=DeliverStatus.pending)
     workflow_shortname: str = "order"
     resolution_reason: str | None = None
-    iccid: str = "8858774455555"
     attachments: dict[str, Any] | None = None
 
     @classmethod
     def payload_body_attributes(cls) -> set[str]:
         return {
             "name",
+            "number",
             "address",
+            "store_shortname",
+            "plan_shortname",
             "mobile",
             "tracking_id",
-            "location",
+            "addons",
+            "high4",
             "language",
             "planned_delivery_date",
             "scheduled_delivery",
+            "delivery",
             "iccid",
         }
 
