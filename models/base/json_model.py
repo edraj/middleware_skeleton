@@ -109,7 +109,7 @@ class JsonModel(BaseModel):
             class_model.shortname = shortname
             return class_model
         except Exception as e:
-            logger.warn(
+            logger.warning(
                 "Failed payload_to_model", extra={"data": attributes, "error": e}
             )
             return None
