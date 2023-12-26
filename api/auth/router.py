@@ -3,10 +3,10 @@ from typing import Annotated, Any
 from venv import logger
 import aiohttp
 from fastapi import APIRouter, Body, Depends, Request, Response
-from api.auth.Requests.otp_request import OTPRequest
-from api.auth.Requests.login_request import LoginRequest
-from api.auth.Requests.register_request import RegisterRequest
-from api.auth.Requests.reset_password_request import ResetPasswordRequest
+from api.auth.requests.otp_request import OTPRequest
+from api.auth.requests.login_request import LoginRequest
+from api.auth.requests.register_request import RegisterRequest
+from api.auth.requests.reset_password_request import ResetPasswordRequest
 from api.schemas.response import ApiException, ApiResponse, Error
 from models.inactive_token import InactiveToken
 from services.facebook_sso import get_facebook_sso
@@ -33,8 +33,8 @@ from fastapi_sso.sso.base import SSOBase
 router = APIRouter()
 
 
-@router.post("/otp-request", response_model_exclude_none=True)
-async def otp_request(request: OTPRequest):
+@router.post("/generate-otp", response_model_exclude_none=True)
+async def generate_otp(request: OTPRequest):
     if request.email:
         otp = Otp(
             user_shortname=special_to_underscore(request.email),
@@ -70,7 +70,7 @@ async def register(request: RegisterRequest):
 
     user_model = User(
         **request.model_dump(
-            exclude={"password_confirmation", "email_otp", "mobile_otp"},
+            exclude={"email_otp", "mobile_otp"},
             exclude_none=True,
         ),
     )

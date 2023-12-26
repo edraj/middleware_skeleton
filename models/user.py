@@ -56,7 +56,6 @@ class User(JsonModel):
         return self.model_dump(
             exclude={
                 "password",
-                "password_confirmation",
                 "full_email",
                 "google_id",
                 "facebook_id",

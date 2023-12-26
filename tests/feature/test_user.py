@@ -54,7 +54,6 @@ async def test_register() -> None:
             "mobile": MOBILE,
             "mobile_otp": mobile_otps[0].split(":")[1],
             "password": PASSWORD,
-            "password_confirmation": PASSWORD,
             "profile_pic_url": "https://pics.com/myname.png",
         },
     )
@@ -118,7 +117,6 @@ async def test_reset_password() -> None:
             "email": EMAIL,
             "otp": reset_otps[0].split(":")[1],
             "password": UPDATED_PASSWORD,
-            "password_confirmation": UPDATED_PASSWORD,
         },
     )
     assert_code_and_status_success(response)

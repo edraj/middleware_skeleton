@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from api.schemas.response import ApiException, ApiResponse, Error
-from api.user.Requests.user_update_request import UserUpdateRequest
+from api.user.requests.user_update_request import UserUpdateRequest
 from models.base.enums import Status
 from models.otp import Otp
 from models.user import User
