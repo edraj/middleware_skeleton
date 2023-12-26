@@ -7,9 +7,9 @@ class RegisterRequest(BaseModel):
     first_name: str = Field(pattern=regex.NAME)
     last_name: str = Field(pattern=regex.NAME)
     email_otp: str | None = None
-    email: str = Field(pattern=regex.EMAIL)
+    email: str = Field(default=None, pattern=regex.EMAIL)
     mobile_otp: str | None = None
-    mobile: str = Field(pattern=regex.MSISDN)
+    mobile: str = Field(default=None, pattern=regex.MSISDN)
     password_confirmation: str = Field(pattern=regex.PASSWORD)
     password: str = Field(pattern=regex.PASSWORD)
     profile_pic_url: str = Field(default=None, pattern=regex.URL)
