@@ -16,12 +16,12 @@ from services.microsoft_sso import get_microsoft_sso
 from services.sms_sender import SMSSender
 from mail.user_reset_password import UserResetPassword
 from mail.user_verification import UserVerification
-from models.user import User
+from models.user import Contact, OAuthIDs, User
 from models.base.enums import OTPFor, Status
 from models.otp import Otp
 from utils.helpers import escape_for_redis, special_to_underscore
 from utils.jwt import JWTBearer, sign_jwt
-from utils.password_hashing import hash_password, verify_password
+from utils.password_hashing import verify_password
 from utils.settings import settings
 from fastapi_sso.sso.base import OpenID
 from fastapi_sso.sso.google import GoogleSSO
@@ -60,7 +60,7 @@ async def generate_otp(request: OTPRequest):
 
 @router.post("/register", response_model_exclude_none=True)
 async def register(request: RegisterRequest):
-    is_valid_otp = await Otp.validate_otps(request.model_dump())
+    is_valid_otp = await Otp.validate_otps(request.contact.model_dump())
 
     if not is_valid_otp:
         raise ApiException(
@@ -70,16 +70,12 @@ async def register(request: RegisterRequest):
 
     user_model = User(
         **request.model_dump(
-            exclude={"email_otp", "mobile_otp"},
+            exclude={
+                "is_oodi_mobile_active",
+            },
             exclude_none=True,
         ),
     )
-
-    if request.email:
-        user_model.is_email_verified = True
-
-    if request.mobile:
-        user_model.is_mobile_verified = True
 
     await user_model.store()
 
@@ -93,22 +89,15 @@ async def register(request: RegisterRequest):
 @router.post("/login", response_model_exclude_none=True)
 async def login(response: Response, request: LoginRequest):
     user: User | None = await User.find(
-        f"@full_email:{{{escape_for_redis(request.email)}}}"
+        f"@contact_full_email:{{{escape_for_redis(request.email)}}}"
         if request.email
-        else f"@mobile:{request.mobile}"
+        else f"@contact_mobile:{request.mobile}"
     )
 
-    if (
-        not user
-        or (
-            (request.email and not user.is_email_verified)
-            or (request.mobile and not user.is_mobile_verified)
-        )
-        or (
-            request.password
-            and user.password
-            and not verify_password(request.password, user.password)
-        )
+    if not user or (
+        request.password
+        and user.password
+        and not verify_password(request.password, user.password)
     ):
         raise ApiException(
             status_code=401,
@@ -157,7 +146,9 @@ async def forgot_password(email: str | None = None, mobile: str | None = None):
         )
 
     user: User | None = await User.find(
-        f"@full_email:{{{escape_for_redis(email)}}}" if email else f"@mobile:{mobile}"
+        f"@contact_full_email:{{{escape_for_redis(email)}}}"
+        if email
+        else f"@contact_mobile:{mobile}"
     )
 
     if not user:
@@ -174,10 +165,10 @@ async def forgot_password(email: str | None = None, mobile: str | None = None):
     await otp.store()
 
     if email:
-        await UserResetPassword.send(user.email, otp.otp)
+        await UserResetPassword.send(user.contact.email, otp.otp)
         message = "Email sent successfully"
     else:
-        await SMSSender.send(user.mobile, otp.otp)
+        await SMSSender.send(user.contact.mobile, otp.otp)
         message = "SMS sent successfully"
 
     return ApiResponse(status=Status.success, message=message)
@@ -185,20 +176,11 @@ async def forgot_password(email: str | None = None, mobile: str | None = None):
 
 @router.post("/reset-password", response_model_exclude_none=True)
 async def reset_password(request: ResetPasswordRequest):
-    if not request.email and not request.mobile:
-        raise ApiException(
-            status_code=401,
-            error=Error(
-                type="auth", code=14, message="Please provide email or mobile number"
-            ),
-        )
-
     user: User | None = await User.find(
-        f"@full_email:{{{escape_for_redis(request.email)}}}"
+        f"@contact_full_email:{{{escape_for_redis(request.email)}}}"
         if request.email
-        else f"@mobile:{request.mobile}"
+        else f"@contact_mobile:{request.mobile}"
     )
-
     if not user:
         raise ApiException(
             status_code=404,
@@ -216,7 +198,7 @@ async def reset_password(request: ResetPasswordRequest):
             error=Error(type="Invalid request", code=307, message="Invalid OTP"),
         )
 
-    user.password = hash_password(request.password)
+    user.password = request.password
     await user.sync()
 
     return ApiResponse(status=Status.success, message="Password updated successfully")
@@ -323,18 +305,29 @@ async def social_login(access_token: str, sso: SSOBase, provider: str) -> User:
 
         content: dict[str, Any] = await response.json()
         provider_user: OpenID = await sso.openid_from_response(content)  # type: ignore
-
+        if not provider_user.email:
+            raise ApiException(
+                status_code=400,
+                error=Error(
+                    type="data",
+                    code=12,
+                    message="User email is not retrieved from the provider",
+                ),
+            )
     user_model: User | None = await User.find(
-        search=f"@{provider}_id:{provider_user.id}"
+        search=f"@oauth_ids_{provider}_id:{provider_user.id}"
     )
 
     if not user_model:
         try:
+            oauth_ids = OAuthIDs()
+            setattr(oauth_ids, f"{provider}_id", provider_user.id)
             user_model = User(
-                **provider_user.model_dump(include={"first_name", "last_name", "email"})
+                first_name=provider_user.first_name or "",
+                last_name=provider_user.last_name or "",
+                contact=Contact(email=provider_user.email),
+                oauth_ids=oauth_ids,
             )
-            user_model.is_email_verified = True
-            setattr(user_model, f"{provider}_id", provider_user.id)
 
         except Exception as e:
             logger.error(

@@ -13,8 +13,7 @@ client = TestClient(app)
 async def get_otps(identifier: str) -> list[str]:
     async with RedisServices() as redis:
         escaped: str = special_to_underscore(identifier)
-        res = await redis.get_keys(f"{escaped}:*")
-        print(f"\n\n {escaped = } \n {res = } \n\n")
+        res = await redis.get_keys(f"otp:{escaped}:*")
         return list(res)
 
 

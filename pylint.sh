@@ -1,6 +1,7 @@
 #!/bin/bash
 
 echo "Pyright ..."
+# PYRIGHT_PYTHON_FORCE_VERSION=latest
 python -m pyright
 echo "Ruff ..."
 python -m ruff check .

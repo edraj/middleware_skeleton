@@ -11,6 +11,7 @@ class UpdateOrderRequest(BaseModel):
     scheduled_delivery: str = Field(default=None, examples=[datetime.now()])
     delivery: Delivery = Field(
         examples=[
+            {"method": DeliveryMethod.store_pickup, "store_shortname": "8ba3ef81"},
             {
                 "method": DeliveryMethod.store_pickup,
                 "address": {
@@ -20,9 +21,9 @@ class UpdateOrderRequest(BaseModel):
                     "street": "Ali Basha",
                     "building": "Tarra",
                     "apartment": "33",
-                    "location": {"latitude": "33.3152° N", "longitude": "44.3661° E"},
+                    "location": {"latitude": 33.3152, "longitude": 44.3661},
                 },
-            }
+            },
         ]
     )
     state: DeliverStatus = Field(

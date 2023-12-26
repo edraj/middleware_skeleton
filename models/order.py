@@ -1,13 +1,12 @@
 from typing import Any
-from pydantic import Field, BaseModel
+from pydantic import Field, BaseModel, ValidationInfo, field_validator
 from models.base.enums import DeliverStatus, DeliveryMethod, Language
 from models.base.ticket_model import TicketModel
-from utils import regex
 
 
 class Location(BaseModel):
-    latitude: str | None = None
-    longitude: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class Address(BaseModel):
@@ -21,25 +20,36 @@ class Address(BaseModel):
 
 
 class Delivery(BaseModel):
+    address: Address | None = None
+    store_shortname: str | None = None
     method: DeliveryMethod
-    address: Address
+
+    @field_validator("method")
+    @classmethod
+    def email_otp_exists(cls, v: str, info: ValidationInfo) -> str:
+        if v == DeliveryMethod.home and not info.data.get("address"):
+            raise ValueError("address is required when the delivery method is home")
+
+        if v == DeliveryMethod.store_pickup and not info.data.get("store_shortname"):
+            raise ValueError(
+                "store_shortname is required when the delivery method is store_pickup"
+            )
+        return v
 
 
 class Order(TicketModel):
-    name: str | None = None
-    number: str | None = None
-    address: Address | None = None
-    store_shortname: str | None = None
+    oodi_mobile: str | None = None
+    user_shortname: str | None = None
     plan_shortname: str | None = None
-    mobile: str = Field(default=None, pattern=regex.MSISDN)
     tracking_id: str | None = None
     addons: list[str] | None = None
-    high4: bool | None = None
+    high5: bool | None = None
     language: Language = Field(default=Language.en)
     planned_delivery_date: str | None = None
     scheduled_delivery: str | None = None
     delivery: Delivery | None = None
     iccid: str = "8858774455555"
+
     state: DeliverStatus = Field(default=DeliverStatus.pending)
     workflow_shortname: str = "order"
     resolution_reason: str | None = None
@@ -48,15 +58,12 @@ class Order(TicketModel):
     @classmethod
     def payload_body_attributes(cls) -> set[str]:
         return {
-            "name",
-            "number",
-            "address",
-            "store_shortname",
+            "oodi_mobile",
+            "user_shortname",
             "plan_shortname",
-            "mobile",
             "tracking_id",
             "addons",
-            "high4",
+            "high5",
             "language",
             "planned_delivery_date",
             "scheduled_delivery",

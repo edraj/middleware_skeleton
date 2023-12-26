@@ -26,7 +26,9 @@ async def test_request_otp(mocker) -> Response | None:  # type: ignore
     mocker.patch("services.sms_sender.SMSSender.send")  # type: ignore
 
     assert_code_and_status_success(
-        client.post(url="/auth/otp-request", json={"email": EMAIL, "mobile": MOBILE})
+        response=client.post(
+            url="/auth/generate-otp", json={"email": EMAIL, "mobile": MOBILE}
+        )
     )
 
 
@@ -35,7 +37,6 @@ async def test_request_otp(mocker) -> Response | None:  # type: ignore
 async def test_register() -> None:
     global _shortname
 
-    print(f"\n\n {EMAIL} \n")
     email_otps: list[str] = get_email_otps(await get_otps(EMAIL), EMAIL)
     assert len(email_otps)
 
@@ -46,15 +47,22 @@ async def test_register() -> None:
     response: Response = client.post(
         "/auth/register",
         json={
-            "email": EMAIL,
-            "email_otp": email_otps[0].split(":")[1],
+            "avatar_url": "https://pics.com/myname.png",
+            "contact": {
+                "email_otp": email_otps[0].split(":")[2],
+                "email": EMAIL,
+                "mobile_otp": mobile_otps[0].split(":")[2],
+                "mobile": MOBILE,
+            },
+            "date_of_birth": "1990-12-31",
             "first_name": "John",
+            "gender": "male",
+            "invitations": {"received": "xff4fdkfisjsk", "sent": []},
             "language": "en",
             "last_name": "Doo",
-            "mobile": MOBILE,
-            "mobile_otp": mobile_otps[0].split(":")[1],
+            "oodi_mobile": "7950385032",
             "password": PASSWORD,
-            "profile_pic_url": "https://pics.com/myname.png",
+            "promo_code": "j42l343kj4",
         },
     )
 
@@ -82,14 +90,14 @@ def test_login_with_mobile() -> None:
 @pytest.mark.asyncio
 async def test_login_with_otp(mocker) -> None:  # type: ignore
     mocker.patch("services.sms_sender.SMSSender.send")  # type: ignore
-    client.post(url="/auth/otp-request", json={"mobile": MOBILE})
+    client.post(url="/auth/generate-otp", json={"mobile": MOBILE})
 
     mobile_otps: list[str] = get_mobile_otps(await get_otps(MOBILE), MOBILE)
     assert mobile_otps
 
     response: Response = client.post(
         "/auth/login",
-        json={"mobile": MOBILE, "mobile_otp": mobile_otps[0].split(":")[1]},
+        json={"mobile": MOBILE, "mobile_otp": mobile_otps[0].split(":")[2]},
     )
 
     assert_code_and_status_success(response)
@@ -115,7 +123,7 @@ async def test_reset_password() -> None:
         "/auth/reset-password",
         json={
             "email": EMAIL,
-            "otp": reset_otps[0].split(":")[1],
+            "otp": reset_otps[0].split(":")[2],
             "password": UPDATED_PASSWORD,
         },
     )
@@ -144,14 +152,15 @@ def test_get_profile() -> None:
 async def test_update_profile(mocker) -> None:  # type: ignore
     failed_response: Response = client.put(
         "/user",
-        json={"email": UPDATED_EMAIL, "mobile": UPDATED_MOBILE},
+        json={"contact": {"email": UPDATED_EMAIL, "mobile": UPDATED_MOBILE}},
     )
     assert failed_response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     mocker.patch("mail.user_verification.UserVerification.send")  # type: ignore
     mocker.patch("services.sms_sender.SMSSender.send")  # type: ignore
     client.post(
-        url="/auth/otp-request", json={"mobile": UPDATED_MOBILE, "email": UPDATED_EMAIL}
+        url="/auth/generate-otp",
+        json={"mobile": UPDATED_MOBILE, "email": UPDATED_EMAIL},
     )
 
     mobile_otps: list[str] = get_mobile_otps(
@@ -164,14 +173,23 @@ async def test_update_profile(mocker) -> None:  # type: ignore
     response: Response = client.put(
         "/user",
         json={
-            "email": UPDATED_EMAIL,
-            "email_otp": email_otps[0].split(":")[1],
-            "mobile": UPDATED_MOBILE,
-            "mobile_otp": mobile_otps[0].split(":")[1],
+            "avatar_url": "https://pics.com/myname.png",
+            "contact": {
+                "email_otp": email_otps[0].split(":")[2],
+                "email": UPDATED_EMAIL,
+                "mobile_otp": mobile_otps[0].split(":")[2],
+                "mobile": UPDATED_MOBILE,
+            },
+            "date_of_birth": "1990-12-31",
             "first_name": "John2",
+            "gender": "male",
+            "invitations": {
+                "received": "xff4fdkfisjsk",
+                "sent": ["first_code", "second_code"],
+            },
             "language": "ar",
             "last_name": "Doo2",
-            "profile_pic_url": "https://pics.com/myname.png",
+            "is_oodi_mobile_active": True,
         },
     )
     assert_code_and_status_success(response)
@@ -212,12 +230,13 @@ def test_get_updated_profile():
         "shortname": _shortname,
         "first_name": "John2",
         "last_name": "Doo2",
-        "email": UPDATED_EMAIL,
-        "mobile": UPDATED_MOBILE,
-        "profile_pic_url": "https://pics.com/myname.png",
+        "contact": {"email": UPDATED_EMAIL, "mobile": UPDATED_MOBILE},
+        "avatar_url": "https://pics.com/myname.png",
         "language": "ar",
-        "is_email_verified": True,
-        "is_mobile_verified": True,
+        "oodi_mobile": "7950385032",
+        "is_oodi_mobile_active": True,
+        "gender": "male",
+        "date_of_birth": "1990-12-31",
     }
 
 

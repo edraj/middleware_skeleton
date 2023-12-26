@@ -71,3 +71,8 @@ class DeliverStatus(StrEnum):
 class DeliveryMethod(StrEnum):
     store_pickup = "store_pickup"
     home = "home"
+
+
+class Gender(StrEnum):
+    male = "male"
+    female = "female"

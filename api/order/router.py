@@ -22,9 +22,7 @@ security = HTTPBearer()
 
 @router.post("/create")
 async def create_order(request: CreateOrderRequest, _=Depends(JWTBearer())):
-    order_model = Order(
-        **request.model_dump(exclude={}, exclude_none=True)
-    )
+    order_model = Order(**request.model_dump(exclude_none=True))
 
     await order_model.store()
 
@@ -106,15 +104,13 @@ async def update_order(
 
     data = request.model_dump(exclude_none=True)
 
-    for key, value in data.items():
-        setattr(order, key, value)
-
-    await order.sync()
+    updated_order = Order(shortname=order.shortname, **data)
+    await updated_order.sync()
 
     return ApiResponse(
         status=Status.success,
         message="Order updated successfully",
-        data=order.represent(),
+        data=updated_order.represent(),
     )
 
 

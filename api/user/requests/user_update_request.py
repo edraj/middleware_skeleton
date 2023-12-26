@@ -1,19 +1,23 @@
-from pydantic import BaseModel, Field, ValidationInfo, field_validator
-from models.base.enums import Language, OperatingSystems
+from pydantic import BaseModel, Field
+from api.auth.requests.register_request import ContactRequest
+from models.base.enums import Gender, Language
+from models.user import Invitations
 from utils import regex
 
 
 class UserUpdateRequest(BaseModel):
     first_name: str = Field(default=None, pattern=regex.NAME)
     last_name: str = Field(default=None, pattern=regex.NAME)
-    email_otp: str | None = None
-    email: str = Field(default=None, pattern=regex.EMAIL)
-    mobile_otp: str | None = None
-    mobile: str = Field(default=None, pattern=regex.MSISDN)
-    profile_pic_url: str = Field(default=None, pattern=regex.URL)
+    contact: ContactRequest | None = None
+    password: str = Field(default=None, pattern=regex.PASSWORD)
+    avatar_url: str = Field(default=None, pattern=regex.URL)
     firebase_token: str | None = None
-    os: OperatingSystems | None = None
     language: Language | None = None
+    oodi_mobile: str = Field(default=None, pattern=regex.MSISDN)
+    is_oodi_mobile_active: bool | None = None
+    invitations: Invitations | None = None
+    gender: Gender | None = None
+    date_of_birth: str | None = None
 
     model_config = {
         "json_schema_extra": {
@@ -21,30 +25,22 @@ class UserUpdateRequest(BaseModel):
                 {
                     "first_name": "John",
                     "last_name": "Doo",
-                    "mobile": "7999228903",
-                    "mobile_otp": "112132",
-                    "email": "myname@gmail.com",
-                    "email_otp": "112132",
-                    "profile_pic_url": "https://pics.com/myname.png",
+                    "contact": {
+                        "mobile": "7999228903",
+                        "mobile_otp": "112132",
+                        "email": "myname@gmail.com",
+                        "email_otp": "112132",
+                    },
+                    "password": "test1234",
+                    "avatar_url": "https://pics.com/myname.png",
                     "language": "en",
-                    "os": "ios",
-                    "firebase_token": "long_string",
+                    "oodi_mobile": "7950385032",
+                    "is_oodi_mobile_active": True,
+                    "invitations": {"received": "xff4fdkfisjsk", "sent": []},
+                    "gender": Gender.male,
+                    "date_of_birth": "1990-12-31",
+                    "promo_code": "j42l343kj4",
                 }
             ]
         }
     }
-
-    @field_validator("email")
-    @classmethod
-    def email_otp_exists(cls, v: str, info: ValidationInfo) -> str:
-        if not info.data.get("email_otp"):
-            raise ValueError("email_otp is required with email")
-        return v
-
-    @field_validator("mobile")
-    @classmethod
-    def mobile_otp_exists(cls, v: str, info: ValidationInfo) -> str:
-        if not info.data.get("mobile_otp"):
-            raise ValueError("mobile_otp is required with mobile")
-
-        return v
