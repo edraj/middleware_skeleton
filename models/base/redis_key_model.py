@@ -65,11 +65,8 @@ class RedisKeyModel(BaseModel):
 
     @classmethod
     async def find(cls, shortname: str, **kwargs: Any) -> Any:
-        print(f"REDIS shortname: {shortname = }")
         model: Self = cls(shortname=shortname, **kwargs)
-        print(f"REDIS MODE: {model = }")
         res = await model.get()
-        print(f"REDIS RES: {res = }")
         return res
 
     @classmethod

@@ -47,7 +47,6 @@ async def test_register() -> None:
     assert email_otp
 
     mobile_otp = await get_otp(MOBILE, OTPOperationType.register)
-    print
     assert mobile_otp
 
     response: Response = client.post(
@@ -144,14 +143,12 @@ def test_login_with_new_password():
     assert_code_and_status_success(response)
     client.cookies.delete("auth_token")
     client.cookies.set("auth_token", response.cookies["auth_token"])
-    print(f" ====>>>>> {response.cookies['auth_token'] = }")
     # TOKEN = response.json().get("data", {}).get("token")
 
 
 @pytest.mark.run(order=1)
 def test_get_profile() -> None:
     response: Response = client.get("/user")
-    print(f" ====>>>>> {client.cookies.get('auth_token') = }")
     assert_code_and_status_success(response)
 
 

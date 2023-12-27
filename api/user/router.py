@@ -32,7 +32,6 @@ async def update(request: UserUpdateRequest, shortname: str = Depends(JWTBearer(
         )
 
     user: User = await User.get_or_fail(shortname)
-    print(f"\n BEFORE UPDATE {user = } \n")
 
     data = request.model_dump(exclude_none=True)
     data.get("contact", {}).pop("email_otp", None)
