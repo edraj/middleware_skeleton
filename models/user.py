@@ -10,7 +10,6 @@ from utils.password_hashing import hash_password
 
 class Contact(BaseModel):
     email: str = Field(default=None, pattern=regex.EMAIL)
-    full_email: list[str] = Field(default=None)
     mobile: str = Field(default=None, pattern=regex.MSISDN)
 
     @model_validator(mode="after")
@@ -57,9 +56,6 @@ class User(JsonModel):
         if self.password:
             self.password = hash_password(self.password)
 
-        if self.contact and self.contact.email:
-            self.contact.full_email = [self.contact.email]
-
         await JsonModel.store(self)
 
         if trigger_events:
@@ -74,9 +70,6 @@ class User(JsonModel):
         if self.password:
             self.password = hash_password(self.password)
 
-        if self.contact and self.contact.email:
-            self.contact.full_email = [self.contact.email]
-
         await JsonModel.sync(self, resource_type)
 
         if trigger_events:
@@ -86,12 +79,11 @@ class User(JsonModel):
         user: dict[str, Any] = self.model_dump(
             exclude={
                 "password",
-                "contact.full_email",
                 "firebase_token",
                 "oauth_ids",
                 "invitations",
             },
             exclude_none=True,
         )
-        user.get("contact", {}).pop("full_email", "")
+        user.get("contact", {})
         return user

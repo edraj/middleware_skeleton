@@ -9,7 +9,6 @@ class UserUpdatedListener:
     async def handle(self) -> None:
         is_outdated = False
         if "email" in self.updated:
-            self.user.full_email = [self.user.email]
             is_outdated = True
 
         """

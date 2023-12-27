@@ -12,7 +12,7 @@ def snake_case(camel_str: str) -> str:
 
 def escape_for_redis(s: str) -> str:
     table: dict[int, str] = str.maketrans(
-        {".": r"\.", "@": r"\@", ":": r"\:", "/": r"\/", "-": r"\-", " ": r"\ "}
+        {".": r".", "@": r".", ":": r"\:", "/": r"\/", "-": r"\-", " ": r"\ "}
     )
     return s.translate(table)
 

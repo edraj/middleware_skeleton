@@ -1,88 +1,84 @@
 {
-    "title": "Acme Users",
-    "description": "This document describes the properties of a user",
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {
-        "first_name": {
-            "description": "First name",
-            "type": "string"
-        },
-        "last_name": {
-            "description": "Last name",
-            "type": "string"
-        },
-        "mobile": {
-            "description": "mobile number",
-            "type": "string"
-        },
-        "email": {
-            "title": "Email",
-            "type": "string"
-        },
-        "full_email": {
-            "title": "Email",
-            "type": "array"
-        },
-        "password": {
-            "title": "password",
-            "type": "string"
-        },
-        "profile_pic_url": {
-            "title": "profile pic url",
-            "type": "string"
-        },
-        "firebase_token": {
-            "type": "string",
-            "title": "Firebase Token"
-        },
-        "os": {
-            "title": "OS",
-            "type": "string",
-            "enum": [
-                "android",
-                "ios"
-            ]
-        },
-        "language": {
-            "title": "Preferred Language",
-            "type": "string",
-            "enum": [
-                "en",
-                "ar",
-                "kd"
-            ]
-        },
-        "is_email_verified": {
-            "type": "boolean",
-            "title": "Is email verified",
-            "default": false
-        },
-        "is_mobile_verified": {
-            "type": "boolean",
-            "title": "Is mobile verified",
-            "default": false
-        },
-        "google_id": {
-            "type": "string"
-        },
-        "facebook_id": {
-            "type": "string"
-        },
-        "twitter_id": {
-            "type": "string"
-        },
-        "github_id": {
-            "type": "string"
-        },
-        "microsoft_id": {
-            "type": "string"
-        }
+  "title": "Acme Users",
+  "description": "This document describes the properties of a user",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "first_name": {
+      "description": "First name",
+      "type": "string"
     },
-    "required": [
-        "first_name",
-        "last_name",
-        "email",
-        "password"
-    ]
+    "last_name": {
+      "description": "Last name",
+      "type": "string"
+    },
+    "mobile": {
+      "description": "mobile number",
+      "type": "string"
+    },
+    "email": {
+      "title": "Email",
+      "type": "string"
+    },
+    "password": {
+      "title": "password",
+      "type": "string"
+    },
+    "profile_pic_url": {
+      "title": "profile pic url",
+      "type": "string"
+    },
+    "firebase_token": {
+      "type": "string",
+      "title": "Firebase Token"
+    },
+    "os": {
+      "title": "OS",
+      "type": "string",
+      "enum": [
+        "android",
+        "ios"
+      ]
+    },
+    "language": {
+      "title": "Preferred Language",
+      "type": "string",
+      "enum": [
+        "en",
+        "ar",
+        "kd"
+      ]
+    },
+    "is_email_verified": {
+      "type": "boolean",
+      "title": "Is email verified",
+      "default": false
+    },
+    "is_mobile_verified": {
+      "type": "boolean",
+      "title": "Is mobile verified",
+      "default": false
+    },
+    "google_id": {
+      "type": "string"
+    },
+    "facebook_id": {
+      "type": "string"
+    },
+    "twitter_id": {
+      "type": "string"
+    },
+    "github_id": {
+      "type": "string"
+    },
+    "microsoft_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "first_name",
+    "last_name",
+    "email",
+    "password"
+  ]
 }
