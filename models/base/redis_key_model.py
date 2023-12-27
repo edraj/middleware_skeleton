@@ -65,16 +65,16 @@ class RedisKeyModel(BaseModel):
 
     @classmethod
     async def find(cls, shortname: str, **kwargs: Any) -> Any:
-        model: Self = cls(shortname=shortname, **kwargs)
+        model = cls(shortname=shortname, **kwargs)
         res = await model.get()
         return res
 
     @classmethod
     async def find_and_remove(cls, shortname: str, **kwargs: Any) -> Any:
-        model: Self = cls(shortname=shortname, **kwargs)
+        model = cls(shortname=shortname, **kwargs)
         return await model.get_and_del()
 
     @classmethod
     async def remove(cls, shortname: str, **kwargs: Any) -> Any:
-        model: Self = cls(shortname=shortname, **kwargs)
+        model = cls(shortname=shortname, **kwargs)
         return await model.delete()

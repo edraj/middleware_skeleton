@@ -65,18 +65,18 @@ async def generate_otp(request: OTPRequest):
         )
 
     if request.email:
-        otp: Otp = await Otp.create(
+        email_otp: Otp = await Otp.create(
             shortname=special_to_underscore(request.email),
             operation_type=request.operation_type,
         )
-        await UserVerification.send(request.email, otp.value)
+        await UserVerification.send(request.email, email_otp.value)
 
     if request.mobile:
-        otp: Otp = await Otp.create(
+        mobile_otp: Otp = await Otp.create(
             shortname=request.mobile,
             operation_type=request.operation_type,
         )
-        await SMSSender.send(request.mobile, otp.value)
+        await SMSSender.send(request.mobile, mobile_otp.value)
 
     return ApiResponse(status=Status.success, message="OTP sent successfully")
 
