@@ -10,9 +10,8 @@ from utils.settings import settings
 
 
 async def decode_jwt(token: str) -> dict[str, Any]:
-    inactive = InactiveToken(token=token)
-    inactive_exists = await inactive.get()
-    if inactive_exists:
+    inactive = await InactiveToken.find(shortname=token)
+    if inactive is not None:
         raise ApiException(
             status.HTTP_401_UNAUTHORIZED,
             Error(type="jwtauth", code=12, message="Invalid Token [1]"),

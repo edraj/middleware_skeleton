@@ -1,8 +1,7 @@
-import random
 from typing import Annotated, Any
 from venv import logger
 import aiohttp
-from fastapi import APIRouter, Body, Depends, Request, Response
+from fastapi import APIRouter, Body, Depends, Request, Response, status
 from api.auth.requests.otp_request import OTPRequest
 from api.auth.requests.login_request import LoginRequest
 from api.auth.requests.register_request import RegisterRequest
@@ -14,10 +13,9 @@ from services.github_sso import get_github_sso
 from services.google_sso import get_google_sso
 from services.microsoft_sso import get_microsoft_sso
 from services.sms_sender import SMSSender
-from mail.user_reset_password import UserResetPassword
 from mail.user_verification import UserVerification
 from models.user import Contact, OAuthIDs, User
-from models.base.enums import OTPFor, Status
+from models.base.enums import OTPOperationType, Status
 from models.otp import Otp
 from utils.helpers import escape_for_redis, special_to_underscore
 from utils.jwt import JWTBearer, sign_jwt
@@ -35,32 +33,59 @@ router = APIRouter()
 
 @router.post("/generate-otp", response_model_exclude_none=True)
 async def generate_otp(request: OTPRequest):
-    if request.email:
-        otp = Otp(
-            user_shortname=special_to_underscore(request.email),
-            otp_for=OTPFor.mail_verification,
-            otp=f"{random.randint(111111, 999999)}",
-        )
-        await otp.store()
+    user: User | None = await User.find(
+        f"@contact_email:{escape_for_redis(request.email)}"
+        if request.email
+        else f"@contact_mobile:{request.mobile}"
+    )
+    exception_message: str | None = None
+    if (
+        request.operation_type
+        in [
+            OTPOperationType.register,
+            OTPOperationType.update_profile,
+        ]
+        and user
+    ):
+        exception_message = "User already exist"
+    elif (
+        request.operation_type
+        in [
+            OTPOperationType.login,
+            OTPOperationType.forgot_password,
+        ]
+        and not user
+    ):
+        exception_message = "User doesn't exist"
 
-        await UserVerification.send(request.email, otp.otp)
+    if exception_message:
+        raise ApiException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            error=Error(type="Invalid request", code=307, message=exception_message),
+        )
+
+    if request.email:
+        otp: Otp = await Otp.create(
+            shortname=special_to_underscore(request.email),
+            operation_type=request.operation_type,
+        )
+        await UserVerification.send(request.email, otp.value)
 
     if request.mobile:
-        otp = Otp(
-            user_shortname=request.mobile,
-            otp_for=OTPFor.mobile_verification,
-            otp=f"{random.randint(111111, 999999)}",
+        otp: Otp = await Otp.create(
+            shortname=request.mobile,
+            operation_type=request.operation_type,
         )
-        await otp.store()
-
-        await SMSSender.send(request.mobile, otp.otp)
+        await SMSSender.send(request.mobile, otp.value)
 
     return ApiResponse(status=Status.success, message="OTP sent successfully")
 
 
 @router.post("/register", response_model_exclude_none=True)
 async def register(request: RegisterRequest):
-    is_valid_otp = await Otp.validate_otps(request.contact.model_dump())
+    is_valid_otp = await Otp.validate_otp_from_request(
+        request.contact.model_dump(), OTPOperationType.register
+    )
 
     if not is_valid_otp:
         raise ApiException(
@@ -105,8 +130,8 @@ async def login(response: Response, request: LoginRequest):
         )
 
     if not request.password:
-        is_valid_otp: bool = await Otp.validate_otps(
-            request.model_dump(exclude_none=True)
+        is_valid_otp: bool = await Otp.validate_otp_from_request(
+            request.model_dump(exclude_none=True), OTPOperationType.login
         )
         if not is_valid_otp:
             raise ApiException(
@@ -135,45 +160,6 @@ async def login(response: Response, request: LoginRequest):
     )
 
 
-@router.get("/forgot-password", response_model_exclude_none=True)
-async def forgot_password(email: str | None = None, mobile: str | None = None):
-    if not email and not mobile:
-        raise ApiException(
-            status_code=401,
-            error=Error(
-                type="auth", code=14, message="Please provide email or mobile number"
-            ),
-        )
-
-    user: User | None = await User.find(
-        f"@contact_email:{escape_for_redis(email)}"
-        if email
-        else f"@contact_mobile:{mobile}"
-    )
-
-    if not user:
-        raise ApiException(
-            status_code=404,
-            error=Error(type="db", code=12, message="User not found"),
-        )
-
-    otp = Otp(
-        user_shortname=user.shortname,
-        otp_for=OTPFor.reset_password,
-        otp=f"{random.randint(111111, 999999)}",
-    )
-    await otp.store()
-
-    if email:
-        await UserResetPassword.send(user.contact.email, otp.otp)
-        message = "Email sent successfully"
-    else:
-        await SMSSender.send(user.contact.mobile, otp.otp)
-        message = "SMS sent successfully"
-
-    return ApiResponse(status=Status.success, message=message)
-
-
 @router.post("/reset-password", response_model_exclude_none=True)
 async def reset_password(request: ResetPasswordRequest):
     user: User | None = await User.find(
@@ -187,12 +173,14 @@ async def reset_password(request: ResetPasswordRequest):
             error=Error(type="db", code=12, message="User not found"),
         )
 
-    otp_model = Otp(
-        user_shortname=user.shortname, otp=request.otp, otp_for=OTPFor.reset_password
+    otp_value = await Otp.find_and_remove(
+        shortname=special_to_underscore(request.email)
+        if request.email
+        else request.mobile,
+        operation_type=OTPOperationType.forgot_password,
     )
-    otp_exists = await otp_model.get_and_del()
 
-    if not otp_exists:
+    if otp_value is None or otp_value != request.otp:
         return ApiResponse(
             status=Status.failed,
             error=Error(type="Invalid request", code=307, message="Invalid OTP"),
@@ -361,10 +349,10 @@ async def logout(
         await user.sync()
 
     decoded_data = await JWTBearer().extract_and_decode(request)
-    inactive_token = InactiveToken(
-        token=decoded_data.get("token", ""), expires=str(decoded_data.get("expires"))
+    await InactiveToken.create(
+        shortname=decoded_data.get("token", ""),
+        expires=str(decoded_data.get("expires")),
     )
-    await inactive_token.store()
 
     response.set_cookie(
         value="",

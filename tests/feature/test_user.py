@@ -1,7 +1,8 @@
 from random import randint
 import time
 import pytest
-from tests.base_test import assert_code_and_status_success, get_otps, client
+from models.base.enums import OTPOperationType
+from tests.base_test import assert_code_and_status_success, get_otp, client
 from utils.redis_services import RedisServices
 from httpx import Response
 from fastapi import status
@@ -27,7 +28,12 @@ async def test_request_otp(mocker) -> Response | None:  # type: ignore
 
     assert_code_and_status_success(
         response=client.post(
-            url="/auth/generate-otp", json={"email": EMAIL, "mobile": MOBILE}
+            url="/auth/generate-otp",
+            json={
+                "email": EMAIL,
+                "mobile": MOBILE,
+                "operation_type": OTPOperationType.register,
+            },
         )
     )
 
@@ -37,21 +43,21 @@ async def test_request_otp(mocker) -> Response | None:  # type: ignore
 async def test_register() -> None:
     global _shortname
 
-    email_otps: list[str] = get_email_otps(await get_otps(EMAIL), EMAIL)
-    assert len(email_otps)
+    email_otp = await get_otp(EMAIL, OTPOperationType.register)
+    assert email_otp
 
-    otps_stored = await get_otps(MOBILE)
-    mobile_otps: list[str] = get_mobile_otps(otps_stored, MOBILE)
-    assert len(mobile_otps)
+    mobile_otp = await get_otp(MOBILE, OTPOperationType.register)
+    print
+    assert mobile_otp
 
     response: Response = client.post(
         "/auth/register",
         json={
             "avatar_url": "https://pics.com/myname.png",
             "contact": {
-                "email_otp": email_otps[0].split(":")[2],
+                "email_otp": email_otp,
                 "email": EMAIL,
-                "mobile_otp": mobile_otps[0].split(":")[2],
+                "mobile_otp": mobile_otp,
                 "mobile": MOBILE,
             },
             "date_of_birth": "1990-12-31",
@@ -69,9 +75,9 @@ async def test_register() -> None:
     assert_code_and_status_success(response)
     json_response = response.json()
     _shortname = json_response.get("data", {}).get("shortname")
-    otps_stored = await get_otps(_shortname)
-    assert get_email_otps(await get_otps(EMAIL), EMAIL) == []
-    assert get_mobile_otps(await get_otps(MOBILE), MOBILE) == []
+
+    assert await get_otp(EMAIL, OTPOperationType.register) is None
+    assert await get_otp(MOBILE, OTPOperationType.register) is None
 
 
 @pytest.mark.run(order=1)
@@ -90,14 +96,17 @@ def test_login_with_mobile() -> None:
 @pytest.mark.asyncio
 async def test_login_with_otp(mocker) -> None:  # type: ignore
     mocker.patch("services.sms_sender.SMSSender.send")  # type: ignore
-    client.post(url="/auth/generate-otp", json={"mobile": MOBILE})
+    client.post(
+        url="/auth/generate-otp",
+        json={"mobile": MOBILE, "operation_type": OTPOperationType.login},
+    )
 
-    mobile_otps: list[str] = get_mobile_otps(await get_otps(MOBILE), MOBILE)
-    assert mobile_otps
+    mobile_otp = await get_otp(MOBILE, OTPOperationType.register)
+    assert mobile_otp
 
     response: Response = client.post(
         "/auth/login",
-        json={"mobile": MOBILE, "mobile_otp": mobile_otps[0].split(":")[2]},
+        json={"mobile": MOBILE, "mobile_otp": mobile_otp},
     )
 
     assert_code_and_status_success(response)
@@ -105,25 +114,21 @@ async def test_login_with_otp(mocker) -> None:  # type: ignore
 
 @pytest.mark.asyncio
 @pytest.mark.run(order=1)
-async def test_forgot_password(mocker) -> None:  # type: ignore
-    mocker.patch("mail.user_reset_password.UserResetPassword.send")  # type: ignore
-    response: Response = client.get(f"/auth/forgot-password?email={EMAIL}")
-    assert_code_and_status_success(response)
-    otps_stored: list[str] = await get_otps(_shortname)
-    assert any(otp.endswith("reset_password") for otp in otps_stored)
+async def test_reset_password(mocker) -> None:  # type: ignore
+    mocker.patch("services.sms_sender.SMSSender.send")  # type: ignore
+    client.post(
+        url="/auth/generate-otp",
+        json={"mobile": MOBILE, "operation_type": OTPOperationType.forgot_password},
+    )
 
+    reset_otp = await get_otp(MOBILE, OTPOperationType.forgot_password)
+    assert reset_otp
 
-@pytest.mark.asyncio
-@pytest.mark.run(order=1)
-async def test_reset_password() -> None:
-    otps_stored: list[str] = await get_otps(_shortname)
-    reset_otps = list(filter(lambda otp: otp.endswith("reset_password"), otps_stored))
-    assert len(reset_otps)
     response = client.post(
         "/auth/reset-password",
         json={
-            "email": EMAIL,
-            "otp": reset_otps[0].split(":")[2],
+            "mobile": MOBILE,
+            "otp": reset_otp,
             "password": UPDATED_PASSWORD,
         },
     )
@@ -137,13 +142,16 @@ def test_login_with_new_password():
         "/auth/login", json={"mobile": MOBILE, "password": UPDATED_PASSWORD}
     )
     assert_code_and_status_success(response)
+    client.cookies.delete("auth_token")
     client.cookies.set("auth_token", response.cookies["auth_token"])
+    print(f" ====>>>>> {response.cookies['auth_token'] = }")
     # TOKEN = response.json().get("data", {}).get("token")
 
 
 @pytest.mark.run(order=1)
 def test_get_profile() -> None:
     response: Response = client.get("/user")
+    print(f" ====>>>>> {client.cookies.get('auth_token') = }")
     assert_code_and_status_success(response)
 
 
@@ -160,24 +168,26 @@ async def test_update_profile(mocker) -> None:  # type: ignore
     mocker.patch("services.sms_sender.SMSSender.send")  # type: ignore
     client.post(
         url="/auth/generate-otp",
-        json={"mobile": UPDATED_MOBILE, "email": UPDATED_EMAIL},
+        json={
+            "mobile": UPDATED_MOBILE,
+            "email": UPDATED_EMAIL,
+            "operation_type": OTPOperationType.update_profile,
+        },
     )
 
-    mobile_otps: list[str] = get_mobile_otps(
-        await get_otps(UPDATED_MOBILE), UPDATED_MOBILE
-    )
-    assert mobile_otps
-    email_otps: list[str] = get_email_otps(await get_otps(UPDATED_EMAIL), UPDATED_EMAIL)
-    assert email_otps
+    email_otp = await get_otp(UPDATED_EMAIL, OTPOperationType.update_profile)
+    assert email_otp
+    mobile_otp = await get_otp(UPDATED_MOBILE, OTPOperationType.update_profile)
+    assert mobile_otp
 
     response: Response = client.put(
         "/user",
         json={
             "avatar_url": "https://pics.com/myname.png",
             "contact": {
-                "email_otp": email_otps[0].split(":")[2],
+                "email_otp": email_otp,
                 "email": UPDATED_EMAIL,
-                "mobile_otp": mobile_otps[0].split(":")[2],
+                "mobile_otp": mobile_otp,
                 "mobile": UPDATED_MOBILE,
             },
             "date_of_birth": "1990-12-31",
@@ -262,23 +272,3 @@ def test_delete_account():
     token = response.json().get("data", {}).get("token")
     response = client.delete("/user", headers={"Authorization": f"Bearer {token}"})
     assert_code_and_status_success(response)
-
-
-def get_email_otps(otps: list[str], email: str) -> list[str]:
-    email_otps = list(
-        filter(
-            lambda otp: otp.endswith("mail_verification"),
-            otps,
-        )
-    )
-    return email_otps
-
-
-def get_mobile_otps(otps: list[str], mobile: str) -> list[str]:
-    mobile_otps = list(
-        filter(
-            lambda otp: otp.endswith("mobile_verification"),
-            otps,
-        )
-    )
-    return mobile_otps

@@ -1,14 +1,14 @@
-from models.base.redis_model import RedisModel
+from models.base.redis_key_model import RedisKeyModel
 from datetime import datetime
 from utils.settings import settings
 
 
-class InactiveToken(RedisModel):
-    token: str
+class InactiveToken(RedisKeyModel):
     expires: str | None = None
 
-    def get_key(self) -> str:
-        return self.token
+    @staticmethod
+    def key_format() -> list[str]:
+        return ["inactive_token:$shortname"]
 
     def get_expiry(self) -> int:
         if self.expires:
@@ -19,5 +19,5 @@ class InactiveToken(RedisModel):
             )
         else:
             seconds = settings.access_token_expire
-        
+
         return seconds

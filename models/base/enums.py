@@ -34,12 +34,6 @@ class Language(StrEnum):
     kd = "kd"
 
 
-class OTPFor(StrEnum):
-    mail_verification = "mail_verification"
-    mobile_verification = "mobile_verification"
-    reset_password = "reset_password"
-
-
 class ResourceType(StrEnum):
     folder = "folder"
     schema = "schema"
@@ -76,3 +70,10 @@ class DeliveryMethod(StrEnum):
 class Gender(StrEnum):
     male = "male"
     female = "female"
+
+
+class OTPOperationType(StrEnum):
+    register = "register"
+    login = "login"
+    update_profile = "update_profile"
+    forgot_password = "forgot_password"

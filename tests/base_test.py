@@ -1,20 +1,22 @@
 import json
+from typing import Any
 from fastapi.testclient import TestClient
 from httpx import Response
 from main import app
 from fastapi import status
+from models.base.enums import OTPOperationType
+from models.otp import Otp
 from utils.helpers import special_to_underscore
 
-from utils.redis_services import RedisServices
 
 client = TestClient(app)
 
 
-async def get_otps(identifier: str) -> list[str]:
-    async with RedisServices() as redis:
-        escaped: str = special_to_underscore(identifier)
-        res = await redis.get_keys(f"otp:{escaped}:*")
-        return list(res)
+async def get_otp(identifier: str, operation_type: OTPOperationType) -> Any:
+    return await Otp.find(
+        shortname=special_to_underscore(identifier),
+        operation_type=operation_type,
+    )
 
 
 def assert_code_and_status_success(response: Response) -> None:
