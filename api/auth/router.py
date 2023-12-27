@@ -88,14 +88,11 @@ async def register(request: RegisterRequest):
 
 @router.post("/login", response_model_exclude_none=True)
 async def login(response: Response, request: LoginRequest):
-    print(f"@contact_email:{escape_for_redis(request.email)}")
     user: User | None = await User.find(
         f"@contact_email:{escape_for_redis(request.email)}"
         if request.email
         else f"@contact_mobile:{request.mobile}"
     )
-    print(user)
-    print(request)
 
     if not user or (
         request.password
@@ -149,7 +146,7 @@ async def forgot_password(email: str | None = None, mobile: str | None = None):
         )
 
     user: User | None = await User.find(
-        f"@contact_email:{{{escape_for_redis(email)}}}"
+        f"@contact_email:{escape_for_redis(email)}"
         if email
         else f"@contact_mobile:{mobile}"
     )
@@ -180,7 +177,7 @@ async def forgot_password(email: str | None = None, mobile: str | None = None):
 @router.post("/reset-password", response_model_exclude_none=True)
 async def reset_password(request: ResetPasswordRequest):
     user: User | None = await User.find(
-        f"@contact_email:{{{escape_for_redis(request.email)}}}"
+        f"@contact_email:{escape_for_redis(request.email)}"
         if request.email
         else f"@contact_mobile:{request.mobile}"
     )
