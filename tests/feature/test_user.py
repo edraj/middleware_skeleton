@@ -73,7 +73,8 @@ async def test_register() -> None:
 
     assert_code_and_status_success(response)
     json_response = response.json()
-    _shortname = json_response.get("data", {}).get("shortname")
+
+    _shortname = json_response.get("data", {}).get("user", {}).get("shortname")
 
     assert await get_otp(EMAIL, OTPOperationType.register) is None
     assert await get_otp(MOBILE, OTPOperationType.register) is None

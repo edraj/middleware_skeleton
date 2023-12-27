@@ -82,7 +82,7 @@ async def generate_otp(request: OTPRequest):
 
 
 @router.post("/register", response_model_exclude_none=True)
-async def register(request: RegisterRequest):
+async def register(response: Response, request: RegisterRequest):
     is_valid_otp = await Otp.validate_otp_from_request(
         request.contact.model_dump(), OTPOperationType.register
     )
@@ -104,10 +104,26 @@ async def register(request: RegisterRequest):
 
     await user_model.store()
 
+    access_token = sign_jwt(
+        {"username": user_model.shortname}, settings.jwt_access_expires
+    )
+
+    response.set_cookie(
+        value=access_token,
+        max_age=settings.jwt_access_expires,
+        key="auth_token",
+        httponly=True,
+        secure=True,
+        samesite="none",
+    )
+
     return ApiResponse(
         status=Status.success,
         message="Account created successfully",
-        data=user_model.represent(),
+        data={
+            "user": user_model.represent(),
+            "token": access_token,
+        },
     )
 
 
