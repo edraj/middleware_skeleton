@@ -28,7 +28,7 @@ async def update(request: UserUpdateRequest, shortname: str = Depends(JWTBearer(
     ):
         raise ApiException(
             status_code=404,
-            error=Error(type="Invalid request", code=307, message="Invalid OTP"),
+            error=Error(type="invalid_request", code=307, message="Invalid OTP"),
         )
 
     user: User = await User.get_or_fail(shortname)

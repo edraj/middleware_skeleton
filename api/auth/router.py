@@ -61,7 +61,7 @@ async def generate_otp(request: OTPRequest):
     if exception_message:
         raise ApiException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            error=Error(type="Invalid request", code=307, message=exception_message),
+            error=Error(type="invalid_request", code=307, message=exception_message),
         )
 
     if request.email:
@@ -90,7 +90,7 @@ async def register(response: Response, request: RegisterRequest):
     if not is_valid_otp:
         raise ApiException(
             status_code=404,
-            error=Error(type="Invalid request", code=307, message="Invalid OTP"),
+            error=Error(type="invalid_request", code=307, message="Invalid OTP"),
         )
 
     user_model = User(
@@ -199,7 +199,7 @@ async def reset_password(request: ResetPasswordRequest):
     if otp_value is None or otp_value != request.otp:
         return ApiResponse(
             status=Status.failed,
-            error=Error(type="Invalid request", code=307, message="Invalid OTP"),
+            error=Error(type="invalid_request", code=307, message="invalid_otp"),
         )
 
     user.password = request.password

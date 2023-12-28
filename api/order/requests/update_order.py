@@ -14,9 +14,7 @@ class UpdateOrderRequest(BaseModel):
                         "method": DeliveryMethod.home,
                         "requested_date": "2023-12-26T18:22:13.532433",
                         "address": {
-                            "city": "Cairo",
                             "governorate_shortname": "Heliopolis",
-                            "district_shortname": "D3",
                             "street": "Ali Basha",
                             "building": "Tarra",
                             "apartment": "33",

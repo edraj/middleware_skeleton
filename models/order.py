@@ -1,6 +1,6 @@
 from typing import Any
 from pydantic import Field, BaseModel, ValidationInfo, field_validator
-from models.base.enums import DeliverStatus, DeliveryMethod, Language
+from models.base.enums import DeliverStatus, DeliveryMethod
 from models.base.ticket_model import TicketModel
 
 
@@ -10,9 +10,7 @@ class Location(BaseModel):
 
 
 class Address(BaseModel):
-    city: str
     governorate_shortname: str
-    district_shortname: str
     building: str
     apartment: str
     street: str

@@ -211,9 +211,7 @@ async def middle(request: Request, call_next):
             content=jsonable_encoder(
                 ApiResponse(
                     status=Status.failed,
-                    error=Error(
-                        type="bad request", code=112, message="Invalid request."
-                    ),
+                    error=Error(type="bad_request", code=112, message="bad_request."),
                 )
             ),
         )

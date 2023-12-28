@@ -14,8 +14,6 @@ ORDER_PAYLOAD: dict[str, Any] = {
         "address": {
             "apartment": "33",
             "building": "Tarra",
-            "city": "Cairo",
-            "district_shortname": "D3",
             "governorate_shortname": "Heliopolis",
             "location": {"latitude": 33.3152, "longitude": 44.3661},
             "street": "Ali Basha",
@@ -54,8 +52,6 @@ def test_update_order():
                 "address": {
                     "apartment": "33",
                     "building": "Tarra",
-                    "city": "Cairo",
-                    "district_shortname": "D3",
                     "governorate_shortname": "Heliopolis",
                     "location": {"latitude": 33.3152, "longitude": 44.3661},
                     "street": "Ali Basha",
