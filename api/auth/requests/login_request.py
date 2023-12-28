@@ -15,6 +15,8 @@ class LoginRequest(BaseModel):
                 {
                     "mobile": "7999228903",
                     "email": "myname@gmail.com",
+                    "email_otp": "123456",
+                    "mobile_otp": "123456",
                     "password": "test1234",
                 }
             ]
