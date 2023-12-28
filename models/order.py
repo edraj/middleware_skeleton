@@ -23,6 +23,8 @@ class Delivery(BaseModel):
     address: Address | None = None
     store_shortname: str | None = None
     method: DeliveryMethod
+    requested_date: str | None = None
+    scheduled_date: str | None = None
 
     @field_validator("method")
     @classmethod
@@ -44,9 +46,6 @@ class Order(TicketModel):
     tracking_id: str | None = None
     addons: list[str] | None = None
     high5: bool | None = None
-    language: Language = Field(default=Language.en)
-    planned_delivery_date: str | None = None
-    scheduled_delivery: str | None = None
     delivery: Delivery | None = None
     iccid: str = "8858774455555"
 
@@ -64,9 +63,6 @@ class Order(TicketModel):
             "tracking_id",
             "addons",
             "high5",
-            "language",
-            "planned_delivery_date",
-            "scheduled_delivery",
             "delivery",
             "iccid",
         }

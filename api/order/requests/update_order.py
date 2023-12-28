@@ -4,16 +4,15 @@ from models.order import Delivery
 
 
 class UpdateOrderRequest(BaseModel):
-    requested_delivery_date: str | None = None
     delivery: Delivery
 
     model_config = {
         "json_schema_extra": {
             "examples": [
                 {
-                    "requested_delivery_date": "2023-12-26T18:22:13.532433",
                     "delivery": {
                         "method": DeliveryMethod.home,
+                        "requested_date": "2023-12-26T18:22:13.532433",
                         "address": {
                             "city": "Cairo",
                             "governorate_shortname": "Heliopolis",
@@ -26,10 +25,10 @@ class UpdateOrderRequest(BaseModel):
                     },
                 },
                 {
-                    "requested_delivery_date": "2023-12-26T18:22:13.532433",
                     "delivery": {
                         "method": DeliveryMethod.store_pickup,
                         "store_shortname": "8ba3ef81",
+                        "requested_date": "2023-12-26T18:22:13.532433",
                     },
                 },
             ]

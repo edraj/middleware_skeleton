@@ -9,7 +9,6 @@ class CreateOrderRequest(BaseModel):
     plan_shortname: str | None = None
     addons: list[str] = []
     high5: bool
-    requested_delivery_date: str | None = None
     delivery: Delivery
 
     model_config = {
@@ -21,9 +20,9 @@ class CreateOrderRequest(BaseModel):
                     "plan_shortname": "ecc82efb",
                     "addons": ["addon_one", "addon_two"],
                     "high5": True,
-                    "requested_delivery_date": "2023-12-26T18:22:13.532433",
                     "delivery": {
                         "method": DeliveryMethod.home,
+                        "requested_date": "2023-12-26T18:22:13.532433",
                         "address": {
                             "city": "Cairo",
                             "governorate_shortname": "Heliopolis",

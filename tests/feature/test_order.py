@@ -49,8 +49,8 @@ def test_update_order():
     response = client.put(
         f"order/{_order_shortname}/update",
         json={
-            "requested_delivery_date": "2023-12-25T13:33:19.583105",
             "delivery": {
+                "requested_date": "2023-12-25T13:33:19.583105",
                 "address": {
                     "apartment": "33",
                     "building": "Tarra",
