@@ -23,6 +23,7 @@ security = HTTPBearer()
 @router.post("/create")
 async def create_order(request: CreateOrderRequest, _=Depends(JWTBearer())):
     order_model = Order(**request.model_dump(exclude_none=True))
+    order_model.state = DeliverStatus.pending
 
     await order_model.store()
 

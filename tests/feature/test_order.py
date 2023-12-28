@@ -7,12 +7,21 @@ from tests.base_test import assert_code_and_status_success, client
 _order_shortname: str = ""
 ORDER_PAYLOAD: dict[str, Any] = {
     "oodi_mobile": "9002213",
-    "user_shortname": "1fd1cc82",
     "plan_shortname": "ecc82efb",
     "addons": ["one", "two"],
     "high5": True,
-    "language": "en",
-    "state": "pending",
+    "delivery": {
+        "address": {
+            "apartment": "33",
+            "building": "Tarra",
+            "city": "Cairo",
+            "district_shortname": "D3",
+            "governorate_shortname": "Heliopolis",
+            "location": {"latitude": 33.3152, "longitude": 44.3661},
+            "street": "Ali Basha",
+        },
+        "method": "home",
+    },
 }
 
 
@@ -40,9 +49,7 @@ def test_update_order():
     response = client.put(
         f"order/{_order_shortname}/update",
         json={
-            "tracking_id": "2342111",
-            "planned_delivery_date": "2023-12-25T13:33:19.583105",
-            "scheduled_delivery": "2023-12-25T13:33:19.583133",
+            "requested_delivery_date": "2023-12-25T13:33:19.583105",
             "delivery": {
                 "address": {
                     "apartment": "33",
@@ -55,11 +62,10 @@ def test_update_order():
                 },
                 "method": "home",
             },
-            "state": "assigned",
         },
     )
     assert_code_and_status_success(response)
-    assert response.json().get("data", {}).get("state") == "assigned"
+    assert response.json().get("data", {}).get("state") == "pending"
 
 
 @pytest.mark.run(order=2)
