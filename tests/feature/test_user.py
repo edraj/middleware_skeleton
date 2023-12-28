@@ -105,7 +105,7 @@ async def test_login_with_otp(mocker) -> None:  # type: ignore
     mobile_otp = await get_otp(MOBILE, OTPOperationType.login)
     assert mobile_otp
 
-    response: Response = client.post(
+    response = client.post(
         "/auth/login",
         json={"mobile": MOBILE, "mobile_otp": mobile_otp},
     )
