@@ -6,9 +6,11 @@ from random import randint
 
 class RedisKeyModel(BaseModel):
     shortname: str
-    value: str = f"{randint(111111, 999999)}"
+    value: str
 
     def __init__(self, **data: Any):
+        if "value" not in data:
+            data["value"] = f"{randint(111111, 999999)}"
         BaseModel.__init__(self, **data)
 
     @staticmethod
@@ -22,10 +24,12 @@ class RedisKeyModel(BaseModel):
 
     def get_key(self) -> str:
         key: str = ""
-        key_items = RedisKeyModel.key_format()
+        key_items = self.__class__.key_format()
         for idx, item in enumerate(key_items):
             if item.startswith("$"):
                 key += getattr(self, item[1:])
+            else:
+                key += item
             if idx < len(key_items) - 1:
                 key += RedisKeyModel.key_separator()
 
@@ -39,6 +43,7 @@ class RedisKeyModel(BaseModel):
 
     async def store(self) -> None:
         async with RedisServices() as redis:
+            print(f"{self.get_key() = } --- {self.get_value() = }")
             await redis.set(
                 key=self.get_key(),
                 value=self.get_value(),
@@ -60,6 +65,7 @@ class RedisKeyModel(BaseModel):
     @classmethod
     async def create(cls, shortname: str, **kwargs: Any) -> Self:
         model: Self = cls(shortname=shortname, **kwargs)
+        print(f"\n {model = } \n")
         await model.store()
         return model
 

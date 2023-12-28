@@ -8,7 +8,7 @@ class InactiveToken(RedisKeyModel):
 
     @staticmethod
     def key_format() -> list[str]:
-        return ["inactive_token:$shortname"]
+        return ["inactive_token", "$shortname"]
 
     def get_expiry(self) -> int:
         if self.expires:

@@ -10,7 +10,7 @@ class Otp(RedisKeyModel):
 
     @staticmethod
     def key_format() -> list[str]:
-        return ["otp:$operation_type:$shortname"]
+        return ["otp", "$operation_type", "$shortname"]
 
     def get_expiry(self) -> int:
         return settings.otp_expire
