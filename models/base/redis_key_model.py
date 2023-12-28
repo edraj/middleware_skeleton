@@ -43,7 +43,6 @@ class RedisKeyModel(BaseModel):
 
     async def store(self) -> None:
         async with RedisServices() as redis:
-            print(f"{self.get_key() = } --- {self.get_value() = }")
             await redis.set(
                 key=self.get_key(),
                 value=self.get_value(),
@@ -65,7 +64,6 @@ class RedisKeyModel(BaseModel):
     @classmethod
     async def create(cls, shortname: str, **kwargs: Any) -> Self:
         model: Self = cls(shortname=shortname, **kwargs)
-        print(f"\n {model = } \n")
         await model.store()
         return model
 

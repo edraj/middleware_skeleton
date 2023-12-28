@@ -96,12 +96,13 @@ def test_login_with_mobile() -> None:
 @pytest.mark.asyncio
 async def test_login_with_otp(mocker) -> None:  # type: ignore
     mocker.patch("services.sms_sender.SMSSender.send")  # type: ignore
-    client.post(
+    response = client.post(
         url="/auth/generate-otp",
         json={"mobile": MOBILE, "operation_type": OTPOperationType.login},
     )
+    assert_code_and_status_success(response)
 
-    mobile_otp = await get_otp(MOBILE, OTPOperationType.register)
+    mobile_otp = await get_otp(MOBILE, OTPOperationType.login)
     assert mobile_otp
 
     response: Response = client.post(
