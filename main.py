@@ -20,7 +20,7 @@ from urllib.parse import quote
 from utils.logger import logging_schema
 from pydantic import ValidationError
 from contextlib import asynccontextmanager
-from api.order.router import router as  orderRouter
+from api.order.router import router as orderRouter
 
 from api.schemas.response import ApiException, ApiResponse, Error
 from models.base.enums import Status
@@ -73,7 +73,7 @@ async def lifespan(app: FastAPI):
     print('{"stage":"shutting down"}')
 
 
-app = FastAPI (
+app = FastAPI(
     lifespan=lifespan,
     title="Middleware API",
     description="""Middleware uservice""",
@@ -166,6 +166,7 @@ async def middle(request: Request, call_next):
                     "status": "failed",
                     "error": {
                         "code": 422,
+                        "type": "validation",
                         "message": "Validation error [2]",
                         "info": e.errors(),
                     },
@@ -287,8 +288,10 @@ app.include_router(
     user_routers, prefix="/user", tags=["user"], dependencies=[Depends(capture_body)]
 )
 
-app.include_router(orderRouter, prefix="/order", tags=["order"],
-                   dependencies=[Depends(capture_body)])
+app.include_router(
+    orderRouter, prefix="/order", tags=["order"], dependencies=[Depends(capture_body)]
+)
+
 
 @app.options("/{x:path}", include_in_schema=False)
 async def myoptions():

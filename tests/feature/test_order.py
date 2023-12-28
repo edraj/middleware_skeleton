@@ -87,8 +87,8 @@ def test_attach_to_order():
 
 
 @pytest.mark.run(order=2)
-def test_query_assigned_orders():
-    response = client.post("/order/query?order_status=assigned")
+def test_query_pending_orders():
+    response = client.post("/order/query?order_status=pending")
     assert_code_and_status_success(response)
     assert response.json().get("data", {}).get("count") >= 1
 
