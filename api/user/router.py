@@ -37,8 +37,9 @@ async def update(request: UserUpdateRequest, shortname: str = Depends(JWTBearer(
     data.get("contact", {}).pop("email_otp", None)
     data.get("contact", {}).pop("mobile_otp", None)
 
-    updated_user = User(shortname=user.shortname, **data)
+    updated_user: User = user.model_copy(update=data, deep=True)
     await updated_user.sync(updated=set(data.keys()))
+    await updated_user.refresh()
 
     return ApiResponse(
         status=Status.success,

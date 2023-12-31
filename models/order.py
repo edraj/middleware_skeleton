@@ -1,5 +1,5 @@
 from typing import Any
-from pydantic import BaseModel, ValidationInfo, field_validator, Field
+from pydantic import BaseModel, Field
 from models.base.enums import DeliverStatus
 from models.base.ticket_model import TicketModel
 
@@ -17,21 +17,8 @@ class Address(BaseModel):
     location: Location | None = None
 
 
-class Delivery(BaseModel):
-    address: Address | None = None
-    store_shortname: str | None = None
-    requested_date: str | None = None
-    scheduled_date: str | None = None
-
-    @field_validator("method")
-    @classmethod
-    def email_otp_exists(cls, v: str, info: ValidationInfo) -> str:
-        if (not info.data.get("address") and not info.data.get("store_shortname")) or (
-            info.data.get("address") and info.data.get("store_shortname")
-        ):
-            raise ValueError("Either address or store_picketup is required")
-
-        return v
+class Store(BaseModel):
+    store_shortname: str
 
 
 class Order(TicketModel):
@@ -41,8 +28,10 @@ class Order(TicketModel):
     tracking_id: str | None = None
     addons: list[str] | None = None
     high5: bool | None = None
-    delivery: Delivery | None = None
-    iccid: str = "8858774455555"
+    delivery_location: Address | Store
+    requested_date: str | None = None
+    scheduled_date: str | None = None
+    iccid: str | None = None
 
     state: DeliverStatus = Field(default=DeliverStatus.pending)
     workflow_shortname: str = "order"
@@ -58,8 +47,10 @@ class Order(TicketModel):
             "tracking_id",
             "addons",
             "high5",
-            "delivery",
+            "delivery_location",
+            "requested_date",
             "iccid",
+            "scheduled_date",
         }
 
     @classmethod

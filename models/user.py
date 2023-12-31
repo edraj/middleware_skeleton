@@ -67,7 +67,7 @@ class User(JsonModel):
         updated: set[str] = set(),
         trigger_events: bool = True,
     ) -> None:
-        if self.password:
+        if self.password and "password" in updated:
             self.password = hash_password(self.password)
 
         await JsonModel.sync(self, resource_type)

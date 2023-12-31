@@ -103,15 +103,15 @@ async def update_order(
 ):
     order: Order = await Order.get_or_fail(shortname)
 
-    data = request.model_dump(exclude_none=True)
-
-    updated_order = Order(shortname=order.shortname, **data)
-    await updated_order.sync()
+    updated_model: Order = order.model_copy(
+        update=request.model_dump(exclude_none=True), deep=True
+    )
+    await updated_model.sync()
 
     return ApiResponse(
         status=Status.success,
         message="Order updated successfully",
-        data=updated_order.represent(),
+        data=updated_model.represent(),
     )
 
 

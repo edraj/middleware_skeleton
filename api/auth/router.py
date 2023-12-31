@@ -203,7 +203,7 @@ async def reset_password(request: ResetPasswordRequest):
         )
 
     user.password = request.password
-    await user.sync()
+    await user.sync(updated={"password"})
 
     return ApiResponse(status=Status.success, message="Password updated successfully")
 

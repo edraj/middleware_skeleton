@@ -10,16 +10,15 @@ ORDER_PAYLOAD: dict[str, Any] = {
     "plan_shortname": "ecc82efb",
     "addons": ["one", "two"],
     "high5": True,
-    "delivery": {
-        "address": {
-            "apartment": "33",
-            "building": "Tarra",
-            "governorate_shortname": "Heliopolis",
-            "location": {"latitude": 33.3152, "longitude": 44.3661},
-            "street": "Ali Basha",
-        },
-        "method": "home",
+    "requested_date": "2023-12-26T18:22:13.532433",
+    "delivery_location": {
+        "apartment": "33",
+        "building": "Tarra",
+        "governorate_shortname": "Heliopolis",
+        "location": {"latitude": 33.3152, "longitude": 44.3661},
+        "street": "Ali Basha",
     },
+    "iccid": "8858774455555",
 }
 
 
@@ -47,21 +46,15 @@ def test_update_order():
     response = client.put(
         f"order/{_order_shortname}/update",
         json={
-            "delivery": {
-                "requested_date": "2023-12-25T13:33:19.583105",
-                "address": {
-                    "apartment": "33",
-                    "building": "Tarra",
-                    "governorate_shortname": "Heliopolis",
-                    "location": {"latitude": 33.3152, "longitude": 44.3661},
-                    "street": "Ali Basha",
-                },
-                "method": "home",
-            },
+            "requested_date": "2024-12-25T13:33:19.583105",
+            "delivery_location": {"store_shortname": "store_shortname"},
         },
     )
     assert_code_and_status_success(response)
     assert response.json().get("data", {}).get("state") == "pending"
+    assert response.json().get("data", {}).get("delivery_location") == {
+        "store_shortname": "store_shortname"
+    }
 
 
 @pytest.mark.run(order=2)
