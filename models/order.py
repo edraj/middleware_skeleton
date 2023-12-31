@@ -1,6 +1,6 @@
 from typing import Any
-from pydantic import Field, BaseModel, ValidationInfo, field_validator
-from models.base.enums import DeliverStatus, DeliveryMethod
+from pydantic import BaseModel, ValidationInfo, field_validator, Field
+from models.base.enums import DeliverStatus
 from models.base.ticket_model import TicketModel
 
 
@@ -20,20 +20,17 @@ class Address(BaseModel):
 class Delivery(BaseModel):
     address: Address | None = None
     store_shortname: str | None = None
-    method: DeliveryMethod
     requested_date: str | None = None
     scheduled_date: str | None = None
 
     @field_validator("method")
     @classmethod
     def email_otp_exists(cls, v: str, info: ValidationInfo) -> str:
-        if v == DeliveryMethod.home and not info.data.get("address"):
-            raise ValueError("address is required when the delivery method is home")
+        if (not info.data.get("address") and not info.data.get("store_shortname")) or (
+            info.data.get("address") and info.data.get("store_shortname")
+        ):
+            raise ValueError("Either address or store_picketup is required")
 
-        if v == DeliveryMethod.store_pickup and not info.data.get("store_shortname"):
-            raise ValueError(
-                "store_shortname is required when the delivery method is store_pickup"
-            )
         return v
 
 

@@ -1,6 +1,5 @@
 from pydantic import BaseModel
 
-from models.base.enums import DeliveryMethod
 from models.order import Delivery
 
 
@@ -20,7 +19,6 @@ class CreateOrderRequest(BaseModel):
                     "addons": ["addon_one", "addon_two"],
                     "high5": True,
                     "delivery": {
-                        "method": DeliveryMethod.home,
                         "requested_date": "2023-12-26T18:22:13.532433",
                         "address": {
                             "governorate_shortname": "Heliopolis",
