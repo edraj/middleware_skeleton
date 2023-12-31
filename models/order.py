@@ -37,6 +37,7 @@ class Order(TicketModel):
     workflow_shortname: str = "order"
     resolution_reason: str | None = None
     attachments: dict[str, Any] | None = None
+    is_open: bool = True
 
     @classmethod
     def payload_body_attributes(cls) -> set[str]:
@@ -55,7 +56,13 @@ class Order(TicketModel):
 
     @classmethod
     def class_attributes(cls) -> set[str]:
-        return {"state", "workflow_shortname", "resolution_reason", "attachments"}
+        return {
+            "state",
+            "workflow_shortname",
+            "resolution_reason",
+            "attachments",
+            "is_open",
+        }
 
     def represent(self) -> dict[str, Any]:
         return self.model_dump(

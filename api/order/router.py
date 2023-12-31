@@ -1,12 +1,11 @@
 from typing import Annotated
-from fastapi import Depends, Path as PathParam, Form
+from fastapi import Depends, Path as PathParam, Form, UploadFile, status
 from fastapi.routing import APIRouter
 from api.order.requests.create_order_request import CreateOrderRequest
 from api.order.requests.update_order import UpdateOrderRequest
-from api.schemas.response import ApiResponse
+from api.schemas.response import ApiException, ApiResponse, Error
 from models.base.enums import CancellationReason, DeliverStatus, Status
 from fastapi.security import HTTPBearer
-from fastapi import UploadFile
 
 # from fastapi import UploadFile
 from models.order import Order
@@ -21,9 +20,12 @@ security = HTTPBearer()
 
 
 @router.post("/create")
-async def create_order(request: CreateOrderRequest, _=Depends(JWTBearer())):
+async def create_order(
+    request: CreateOrderRequest, logged_in_user: str = Depends(JWTBearer())
+):
     order_model = Order(**request.model_dump(exclude_none=True))
     order_model.state = DeliverStatus.pending
+    order_model.user_shortname = logged_in_user
 
     await order_model.store()
 
@@ -102,6 +104,13 @@ async def update_order(
     _=Depends(JWTBearer()),
 ):
     order: Order = await Order.get_or_fail(shortname)
+    if not order.is_open:
+        raise ApiException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            error=Error(
+                type="bad_request", code=112, message="The order already closed"
+            ),
+        )
 
     updated_model: Order = order.model_copy(
         update=request.model_dump(exclude_none=True), deep=True

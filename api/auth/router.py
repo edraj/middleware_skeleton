@@ -250,7 +250,7 @@ async def facebook_login(
     )
 
 
-@router.get("/github/login")
+@router.post("/github/login")
 async def github_login(
     access_token: Annotated[str, Body()],
     github_sso: GithubSSO = Depends(get_github_sso),
@@ -271,7 +271,7 @@ async def github_login(
     )
 
 
-@router.get("/microsoft/login")
+@router.post("/microsoft/login")
 async def microsoft_login(
     access_token: Annotated[str, Body()],
     microsoft_sso: MicrosoftSSO = Depends(get_microsoft_sso),
