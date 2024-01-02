@@ -7,6 +7,7 @@ from api.auth.requests.login_request import LoginRequest
 from api.auth.requests.register_request import RegisterRequest
 from api.auth.requests.reset_password_request import ResetPasswordRequest
 from api.schemas.response import ApiException, ApiResponse, Error
+from models.active_session import ActiveSession
 from models.inactive_token import InactiveToken
 from services.facebook_sso import get_facebook_sso
 from services.github_sso import get_github_sso
@@ -155,17 +156,7 @@ async def login(response: Response, request: LoginRequest):
                 error=Error(type="auth", code=14, message="Invalid OTP"),
             )
 
-    access_token = sign_jwt({"username": user.shortname}, settings.jwt_access_expires)
-
-    response.set_cookie(
-        value=access_token,
-        max_age=settings.jwt_access_expires,
-        key="auth_token",
-        httponly=True,
-        secure=True,
-        samesite="none",
-    )
-
+    access_token: str = await sign_the_user(user.shortname, response)
     return ApiResponse(
         status=Status.success,
         message="Logged in successfully",
@@ -210,84 +201,80 @@ async def reset_password(request: ResetPasswordRequest):
 
 @router.post("/google/login")
 async def google_profile(
+    response: Response,
     access_token: Annotated[str, Body()],
     google_sso: GoogleSSO = Depends(get_google_sso),
 ):
     user_model = await social_login(access_token, google_sso, "google")
 
-    access_token = sign_jwt(
-        {"username": user_model.shortname}, settings.jwt_access_expires
-    )
+    sys_access_token: str = await sign_the_user(user_model.shortname, response)
 
     return ApiResponse(
         status=Status.success,
         message="Logged in successfully",
         data={
             "user": user_model.represent(),
-            "token": access_token,
+            "token": sys_access_token,
         },
     )
 
 
 @router.post("/facebook/login")
 async def facebook_login(
+    response: Response,
     access_token: Annotated[str, Body()],
     facebook_sso: FacebookSSO = Depends(get_facebook_sso),
 ):
     user_model = await social_login(access_token, facebook_sso, "facebook")
 
-    access_token = sign_jwt(
-        {"username": user_model.shortname}, settings.jwt_access_expires
-    )
+    sys_access_token: str = await sign_the_user(user_model.shortname, response)
 
     return ApiResponse(
         status=Status.success,
         message="Logged in successfully",
         data={
             "user": user_model.represent(),
-            "token": access_token,
+            "token": sys_access_token,
         },
     )
 
 
 @router.post("/github/login")
 async def github_login(
+    response: Response,
     access_token: Annotated[str, Body()],
     github_sso: GithubSSO = Depends(get_github_sso),
 ):
     user_model = await social_login(access_token, github_sso, "github")
 
-    access_token = sign_jwt(
-        {"username": user_model.shortname}, settings.jwt_access_expires
-    )
+    sys_access_token: str = await sign_the_user(user_model.shortname, response)
 
     return ApiResponse(
         status=Status.success,
         message="Logged in successfully",
         data={
             "user": user_model.represent(),
-            "token": access_token,
+            "token": sys_access_token,
         },
     )
 
 
 @router.post("/microsoft/login")
 async def microsoft_login(
+    response: Response,
     access_token: Annotated[str, Body()],
     microsoft_sso: MicrosoftSSO = Depends(get_microsoft_sso),
 ):
     user_model = await social_login(access_token, microsoft_sso, "microsoft")
 
-    access_token = sign_jwt(
-        {"username": user_model.shortname}, settings.jwt_access_expires
-    )
+    sys_access_token: str = await sign_the_user(user_model.shortname, response)
 
     return ApiResponse(
         status=Status.success,
         message="Logged in successfully",
         data={
             "user": user_model.represent(),
-            "token": access_token,
+            "token": sys_access_token,
         },
     )
 
@@ -370,6 +357,8 @@ async def logout(
         expires=str(decoded_data.get("expires")),
     )
 
+    await ActiveSession.remove(shortname)
+
     response.set_cookie(
         value="",
         max_age=0,
@@ -380,3 +369,20 @@ async def logout(
     )
 
     return ApiResponse(status=Status.success, message="Logged out successfully")
+
+
+async def sign_the_user(shortname: str, response: Response) -> str:
+    access_token: str = sign_jwt({"username": shortname}, settings.jwt_access_expires)
+    active_session = ActiveSession(shortname=shortname, token=access_token)
+    await active_session.store()
+
+    response.set_cookie(
+        value=access_token,
+        max_age=settings.jwt_access_expires,
+        key="auth_token",
+        httponly=True,
+        secure=True,
+        samesite="none",
+    )
+
+    return access_token

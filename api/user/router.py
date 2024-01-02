@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from api.schemas.response import ApiException, ApiResponse, Error
 from api.user.requests.user_update_request import UserUpdateRequest
+from models.active_session import ActiveSession
 from models.base.enums import OTPOperationType, Status
 from models.otp import Otp
 from models.user import User
@@ -51,6 +52,8 @@ async def update(request: UserUpdateRequest, shortname: str = Depends(JWTBearer(
 @router.delete("", response_model_exclude_none=True)
 async def delete(shortname: str = Depends(JWTBearer())):
     user: User = await User.get_or_fail(shortname)
+
+    await ActiveSession.remove(user.shortname)
 
     await user.delete()
 

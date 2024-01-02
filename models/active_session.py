@@ -1,19 +1,15 @@
-from typing import Any
 from models.base.redis_key_model import RedisKeyModel
 from datetime import datetime
 from utils.settings import settings
 
 
-class InactiveToken(RedisKeyModel):
+class ActiveSession(RedisKeyModel):
     expires: str | None = None
-
-    def __init__(self, **data: Any):
-        data["value"] = "1"
-        RedisKeyModel.__init__(self, **data)
+    token: str | None = None
 
     @staticmethod
     def key_format() -> list[str]:
-        return ["inactive_token", "$shortname"]
+        return ["active_session", "$shortname"]
 
     def get_expiry(self) -> int:
         if self.expires:
@@ -26,3 +22,7 @@ class InactiveToken(RedisKeyModel):
             seconds = settings.access_token_expire
 
         return seconds
+    
+    def get_value(self) -> str:
+        return self.token or self.shortname
+        
