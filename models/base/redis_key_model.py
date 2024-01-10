@@ -6,7 +6,7 @@ from random import randint
 
 class RedisKeyModel(BaseModel):
     shortname: str
-    value: str
+    value: str | None = None
 
     def __init__(self, **data: Any):
         if "value" not in data:
