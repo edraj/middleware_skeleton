@@ -10,7 +10,6 @@ class CreateOrderRequest(BaseModel):
     high5: bool
     requested_date: str | None = None
     delivery_location: Address | Store
-    iccid: str
 
     model_config = {
         "json_schema_extra": {
@@ -21,7 +20,6 @@ class CreateOrderRequest(BaseModel):
                     "addons": ["addon_one", "addon_two"],
                     "high5": True,
                     "requested_date": "2023-12-26T18:22:13.532433",
-                    "iccid": "8858774455555",
                     "delivery_location": {
                         "governorate_shortname": "Heliopolis",
                         "street": "Ali Basha",
@@ -36,7 +34,6 @@ class CreateOrderRequest(BaseModel):
                     "addons": ["addon_one", "addon_two"],
                     "high5": True,
                     "requested_date": "2023-12-26T18:22:13.532433",
-                    "iccid": "8858774455555",
                     "delivery_location": {"store_shortname": "Heliopolis"},
                 },
             ]
