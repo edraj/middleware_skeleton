@@ -264,7 +264,7 @@ def test_get_profile_after_logout():
 @pytest.mark.run(order=10)
 def test_delete_account():
     global token
-    response: Response = client.post(
+    response = client.post(
         "/auth/login", json={"email": UPDATED_EMAIL, "password": UPDATED_PASSWORD}
     )
     assert_code_and_status_success(response)

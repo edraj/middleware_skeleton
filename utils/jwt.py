@@ -82,8 +82,8 @@ class JWTBearer(HTTPBearer):
             )
 
         decoded: dict[str, Any] = await decode_jwt(auth_token)
-        if decoded and decoded.get("data", {}).get("username"):
-            return decoded["data"]["username"]
+        if decoded and "data" in decoded and "username" in decoded["data"] and str(decoded["data"]["username"]):
+            return str(decoded["data"]["username"])
 
         raise ApiException(
             status.HTTP_401_UNAUTHORIZED,

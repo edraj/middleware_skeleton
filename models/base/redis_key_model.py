@@ -39,7 +39,7 @@ class RedisKeyModel(BaseModel):
         return 300
 
     def get_value(self) -> str:
-        return self.value
+        return str(self.value)
 
     async def store(self) -> None:
         async with RedisServices() as redis:

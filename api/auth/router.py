@@ -70,14 +70,14 @@ async def generate_otp(request: OTPRequest):
             shortname=special_to_underscore(request.email),
             operation_type=request.operation_type,
         )
-        await UserVerification.send(request.email, email_otp.value)
+        await UserVerification.send(request.email, str(email_otp.value))
 
     if request.mobile:
         mobile_otp: Otp = await Otp.create(
             shortname=request.mobile,
             operation_type=request.operation_type,
         )
-        await SMSSender.send(request.mobile, mobile_otp.value)
+        await SMSSender.send(request.mobile, str(mobile_otp.value))
 
     return ApiResponse(status=Status.success, message="OTP sent successfully")
 
@@ -105,18 +105,17 @@ async def register(response: Response, request: RegisterRequest):
 
     await user_model.store()
 
-    access_token = sign_jwt(
-        {"username": user_model.shortname}, settings.jwt_access_expires
-    )
+    # access_token = sign_jwt( {"username": user_model.shortname}, settings.jwt_access_expires)
 
-    response.set_cookie(
-        value=access_token,
-        max_age=settings.jwt_access_expires,
-        key="auth_token",
-        httponly=True,
-        secure=True,
-        samesite="none",
-    )
+    access_token: str = await sign_the_user(user_model.shortname, response)
+    # response.set_cookie(
+    #     value=access_token,
+    #     max_age=settings.jwt_access_expires,
+    #     key="auth_token",
+    #     httponly=True,
+    #     secure=True,
+    #     samesite="none",
+    # )
 
     return ApiResponse(
         status=Status.success,
