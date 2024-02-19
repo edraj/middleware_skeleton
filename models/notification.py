@@ -4,7 +4,6 @@ from datetime import datetime
 from pydantic import BaseModel
 from models.base.enums import NotificationPriority
 from models.base.json_model import JsonModel
-from models.user import User
 
 class Translation(BaseModel):
     en: str | None = None
