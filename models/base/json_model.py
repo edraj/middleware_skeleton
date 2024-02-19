@@ -14,6 +14,7 @@ model_data_mapper: dict[str, dict[str, str]] = {
     "otp": {"subpath": "otps", "schema": Schema.otp},
     "inactive_token": {"subpath": "inactive_tokens", "schema": Schema.inactive_token},
     "order": {"subpath": "orders", "schema": Schema.order},
+    "notification": {"subpath": "notifications", "schema": Schema.meta},
 }
 
 
@@ -38,22 +39,24 @@ class JsonModel(BaseModel):
 
     async def store(self, resource_type: ResourceType = ResourceType.content) -> None:
         model_name = snake_case(self.__class__.__name__)
+        attributes: dict[str, Any] = self.model_dump(exclude_none=True, include=self.class_attributes())
+        if model_data_mapper[model_name]["schema"] != Schema.meta:
+            attributes.update({
+                "payload": {
+                    "content_type": "json",
+                    "schema_shortname": model_data_mapper[model_name]["schema"],
+                    "body": self.model_dump(
+                        exclude_none=True, include=self.payload_body_attributes()
+                    ),
+                },
+            })
         result = await dmart.create(
             space_name=Space.acme,
             subpath=model_data_mapper[model_name]["subpath"],
             shortname=self.shortname if self.shortname else "auto",
             attributes={
-                **self.model_dump(exclude_none=True, include=self.class_attributes()),
-                **{
-                    "is_active": True,
-                    "payload": {
-                        "content_type": "json",
-                        "schema_shortname": model_data_mapper[model_name]["schema"],
-                        "body": self.model_dump(
-                            exclude_none=True, include=self.payload_body_attributes()
-                        ),
-                    },
-                },
+                "is_active": True,
+                **attributes
             },
             resource_type=resource_type,
         )
@@ -61,22 +64,24 @@ class JsonModel(BaseModel):
 
     async def sync(self, resource_type: ResourceType = ResourceType.content) -> None:
         model_name = snake_case(self.__class__.__name__)
+        attributes: dict[str, Any] = self.model_dump(exclude_none=True, include=self.class_attributes())
+        if model_data_mapper[model_name]["schema"] != Schema.meta:
+            attributes.update({
+                "payload": {
+                    "content_type": "json",
+                    "schema_shortname": model_data_mapper[model_name]["schema"],
+                    "body": self.model_dump(
+                        exclude_none=True, include=self.payload_body_attributes()
+                    ),
+                },
+            })
         await dmart.update(
             space_name=Space.acme,
             subpath=model_data_mapper[model_name]["subpath"],
             shortname=self.shortname,
             attributes={
-                **self.model_dump(exclude_none=True, include=self.class_attributes()),
-                **{
-                    "is_active": True,
-                    "payload": {
-                        "content_type": "json",
-                        "schema_shortname": model_data_mapper[model_name]["schema"],
-                        "body": self.model_dump(
-                            exclude_none=True, include=self.payload_body_attributes()
-                        ),
-                    },
-                },
+                "is_active": True,
+                **attributes
             },
             resource_type=resource_type,
         )

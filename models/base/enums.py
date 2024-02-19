@@ -12,6 +12,7 @@ class Schema(StrEnum):
     otp = "otp"
     inactive_token = "inactive_token"
     order = "order"
+    meta = "meta"
 
 
 class Space(StrEnum):

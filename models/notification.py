@@ -24,11 +24,11 @@ class Notification(JsonModel):
     
     @classmethod
     def payload_body_attributes(cls) -> set[str]:
-        return {"is_read", "priority"}
+        return set()
 
     @classmethod
     def class_attributes(cls) -> set[str]:
         return {
-            "shortname", "displayname", "description", "created_at", "updated_at", "owner_shortname"
+            "shortname", "displayname", "description", "created_at", "updated_at", "owner_shortname", "is_read", "priority"
         }
     
