@@ -72,3 +72,8 @@ class OTPOperationType(StrEnum):
     login = "login"
     update_profile = "update_profile"
     forgot_password = "forgot_password"
+
+class NotificationPriority(StrEnum):
+    high = "high"
+    medium = "medium"
+    low = "low"

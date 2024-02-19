@@ -4,6 +4,7 @@ from events.user_created import UserCreatedEvent
 from events.user_updated import UserUpdatedEvent
 from models.base.enums import Gender, Language, ResourceType
 from models.base.json_model import JsonModel
+from models.notification import Notification
 from utils import regex
 from utils.password_hashing import hash_password
 
@@ -87,3 +88,8 @@ class User(JsonModel):
         )
         user.get("contact", {})
         return user
+    
+    async def notifications(self) -> list[Notification]:
+        return await Notification.search(
+            f"@owner_shortname:{self.shortname}"
+        )
