@@ -32,6 +32,7 @@ import socket
 import subprocess
 from api.auth.router import router as auth
 from api.user.router import router as user_routers
+from api.notification.router import router as notification_routers
 
 service_start_time: str = ""
 version: str = "unknown"
@@ -284,6 +285,10 @@ app.include_router(
 
 app.include_router(
     user_routers, prefix="/user", tags=["user"], dependencies=[Depends(capture_body)]
+)
+
+app.include_router(
+    notification_routers, prefix="/notification", tags=["notification"], dependencies=[Depends(capture_body)]
 )
 
 app.include_router(
