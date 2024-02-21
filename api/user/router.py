@@ -6,7 +6,7 @@ from models.base.enums import OTPOperationType, Status
 from models.otp import Otp
 from models.user import User
 from utils.jwt import JWTBearer
-
+from utils.settings import settings
 
 router = APIRouter()
 
@@ -53,7 +53,8 @@ async def update(request: UserUpdateRequest, shortname: str = Depends(JWTBearer(
 async def delete(shortname: str = Depends(JWTBearer())):
     user: User = await User.get_or_fail(shortname)
 
-    await ActiveSession.remove(user.shortname)
+    if settings.one_session_per_user:
+        await ActiveSession.remove(user.shortname)
 
     await user.delete()
 

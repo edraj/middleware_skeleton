@@ -356,7 +356,8 @@ async def logout(
         expires=str(decoded_data.get("expires")),
     )
 
-    await ActiveSession.remove(shortname)
+    if settings.one_session_per_user:
+        await ActiveSession.remove(shortname)
 
     response.set_cookie(
         value="",
@@ -372,8 +373,10 @@ async def logout(
 
 async def sign_the_user(shortname: str, response: Response) -> str:
     access_token: str = sign_jwt({"username": shortname}, settings.jwt_access_expires)
-    active_session = ActiveSession(shortname=shortname, token=access_token)
-    await active_session.store()
+    
+    if settings.one_session_per_user:
+        active_session = ActiveSession(shortname=shortname, token=access_token)
+        await active_session.store()
 
     response.set_cookie(
         value=access_token,

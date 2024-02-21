@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     app_name: str = "dmart-middleware"
     app_url: str = ""
     log_file: str = "../logs/middleware.ljson.log"
-    log_handlers: list[str] = ["console", "file"]
+    log_handlers: list[str] = ["file"]
     jwt_secret: str = ""
     jwt_algorithm: str = ""
     jwt_access_expires: int = 14400
@@ -43,6 +43,8 @@ class Settings(BaseSettings):
 
     sms_provider_host: str = ""
     mock_sms_provider: bool = True
+    
+    one_session_per_user: bool = False
 
     api_key: str = ""
     servername: str = ""  # This is for print purposes only.

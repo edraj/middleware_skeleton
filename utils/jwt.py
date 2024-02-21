@@ -43,14 +43,15 @@ async def decode_jwt(token: str) -> dict[str, Any]:
             Error(type="jwtauth", code=13, message="Expired Token"),
         )
 
-    active_session_token = await ActiveSession.find(
-        decoded_token["data"].get("username", "")
-    )
-    if active_session_token != token:
-        raise ApiException(
-            status.HTTP_401_UNAUTHORIZED,
-            Error(type="jwtauth", code=12, message="Invalid Token [4]"),
+    if settings.one_session_per_user:
+        active_session_token = await ActiveSession.find(
+            decoded_token["data"].get("username", "")
         )
+        if active_session_token != token:
+            raise ApiException(
+                status.HTTP_401_UNAUTHORIZED,
+                Error(type="jwtauth", code=12, message="Invalid Token [4]"),
+            )
 
     return decoded_token
 
