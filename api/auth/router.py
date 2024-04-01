@@ -132,7 +132,7 @@ async def login(response: Response, request: LoginRequest):
     user: User | None = await User.find(
         f"@contact_email:{escape_for_redis(request.email)}"
         if request.email
-        else f"@contact_mobile:{request.mobile}"
+        else f"@oodi_mobile:{request.mobile}"
     )
 
     if not user or (
