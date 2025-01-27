@@ -1,10 +1,8 @@
 #!/bin/bash
 
 echo "Pyright ..."
-# PYRIGHT_PYTHON_FORCE_VERSION=latest
-python -m pyright
+python -m pyright .
 echo "Ruff ..."
-python -m ruff check .
+python -m ruff check --exclude pytests .
 echo "Mypy ..."
-python -m mypy --explicit-package-bases --warn-return-any .
-
+python -m mypy --explicit-package-bases --warn-return-any --check-untyped-defs --exclude loadtest --exclude tests .

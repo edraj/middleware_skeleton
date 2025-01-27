@@ -1,43 +1,28 @@
-from io import BytesIO
-import json
+from uuid import uuid4
 import aiohttp
-from models.base.enums import CancellationReason, ResourceType, Space
+
+from models.core import Space, Schema
 from utils.settings import settings
 from enum import Enum
-from typing import Any, BinaryIO
+from typing import Any
 from fastapi import status
-from api.schemas.response import ApiException, Error
-from fastapi.logger import logger
+from models.api import Exception, Error
+import json_logging
 
 
 class RequestType(str, Enum):
     create = "create"
-    read = "read"
     update = "update"
     delete = "delete"
-
-
-class RequestMethod(str, Enum):
-    get = "get"
-    post = "post"
-    delete = "delete"
-    put = "put"
-    patch = "patch"
 
 
 class DMart:
     auth_token = ""
 
-    @property
-    def json_headers(self) -> dict[str, str]:
+    def get_headers(self):
         return {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.auth_token}",
-        }
-
-    @property
-    def headers(self) -> dict[str, str]:
-        return {
+            "X-Correlation-ID": json_logging.get_correlation_id(),
             "Authorization": f"Bearer {self.auth_token}",
         }
 
@@ -50,7 +35,7 @@ class DMart:
             url = f"{settings.dmart_url}/user/login"
             response = await session.post(
                 url,
-                headers=self.json_headers,
+                headers=self.get_headers(),
                 json=json,
             )
             resp_json = await response.json()
@@ -59,53 +44,46 @@ class DMart:
                 and resp_json["error"]["type"] == "jwtauth"
             ):
                 raise ConnectionError()
-
             self.auth_token = resp_json["records"][0]["attributes"]["access_token"]
 
-    async def __api(
-        self,
-        endpoint: str,
-        method: RequestMethod,
-        json: dict[str, Any] | None = None,
-        data: aiohttp.FormData | None = None,
-    ) -> dict[str, Any]:
-        if not self.auth_token:
-            await self.login()
-
-        resp_json: dict[str, Any] = {}
+    async def __api(self, endpoint, json=None):
+        resp_json = {}
         response: aiohttp.ClientResponse | None = None
-        try:
-            async with aiohttp.ClientSession() as session:
-                response = await session.request(
-                    method.value,
-                    f"{settings.dmart_url}{endpoint}",
-                    headers=self.json_headers if json else self.headers,
-                    json=json if not data else None,
-                    data=data if data else None,
-                )
-                resp_json = await response.json()
+        for _ in range(3):
+            url = f"{settings.dmart_url}{endpoint}"
+            try:
+                async with aiohttp.ClientSession() as session:
+                    if json:
+                        response = await session.post(
+                            url, headers=self.get_headers(), json=json
+                        )
+                    else:
+                        response = await session.get(url, headers=self.get_headers())
 
-        except ConnectionError as e:
-            logger.warn(
-                "Failed request to Dmart core",
-                {
-                    "endpoint": endpoint,
-                    "method": method,
-                    "json": json,
-                    "data": data,
-                    "error": e.args,
-                },
-            )
+                    resp_json = await response.json()
 
-        if response is None or response.status != 200:
-            message: str = resp_json.get("error", {}).get("message", "")
-            raise ApiException(
+                if (
+                    resp_json
+                    and resp_json.get("status", None) == "failed"
+                    and resp_json.get("error", {}).get("type", None) == "jwtauth"
+                ):
+                    await self.login()
+                    raise ConnectionError()
+
+                break
+            except ConnectionError:
+                continue
+        if response is not None and response.status != 200:
+            message = resp_json.get("error", {}).get("message", {})
+            raise Exception(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 error=Error(
                     type="dmart",
                     code=260,
-                    message=f"{message} AT {endpoint}",
-                    info=resp_json.get("error", {}).get("info", None),
+                    message=[
+                        {"endbpoint": endpoint},
+                        {"response": message},
+                    ],
                 ),
             )
 
@@ -114,167 +92,32 @@ class DMart:
     async def __request(
         self,
         space_name: Space,
-        subpath: str,
-        shortname: str,
+        subpath,
+        shortname,
         request_type: RequestType,
         attributes: dict[str, Any] = {},
-        resource_type: ResourceType = ResourceType.content,
-    ) -> dict[str, Any]:
-        return await self.__api(
-            "/managed/request",
-            RequestMethod.post,
-            {
-                "space_name": space_name,
-                "request_type": request_type,
-                "records": [
-                    {
-                        "resource_type": resource_type,
-                        "subpath": subpath,
-                        "shortname": shortname,
-                        "attributes": attributes,
-                    }
-                ],
-            },
-        )
-
-    async def create(
-        self,
-        space_name: Space,
-        subpath: str,
-        attributes: dict[str, Any],
-        shortname: str = "auto",
-        resource_type: ResourceType = ResourceType.content,
-    ) -> dict[str, Any]:
-        return await self.__request(
-            space_name,
-            subpath,
-            shortname,
-            RequestType.create,
-            attributes,
-            resource_type,
-        )
-
-    async def upload_resource_with_payload(
-        self,
-        space_name: Space,
-        record: dict[str, Any],
-        payload: BinaryIO,
-        payload_file_name: str,
-        payload_mime_type: str,
     ):
-        record_file = BytesIO(bytes(json.dumps(record), "utf-8"))
+        endpoint = "/managed/request"
+        json = {
+            "space_name": space_name.value,
+            "request_type": request_type,
+            "records": [
+                {
+                    "resource_type": "content",
+                    "subpath": subpath,
+                    "shortname": shortname,
+                    "attributes": attributes,
+                }
+            ],
+        }
+        return await self.__api(endpoint, json)
 
-        data = aiohttp.FormData()
-        data.add_field(
-            "request_record",
-            record_file,
-            filename="record.json",
-            content_type="application/json",
-        )
-        data.add_field(
-            "payload_file",
-            payload,
-            filename=payload_file_name,
-            content_type=payload_mime_type,
-        )
-        data.add_field("space_name", space_name)
-
-        return await self.__api(
-            endpoint="/managed/resource_with_payload",
-            method=RequestMethod.post,
-            data=data,
-        )
-
-    async def read(
-        self,
-        space_name: Space,
-        subpath: str,
-        shortname: str,
-        retrieve_attachments: bool = False,
-        resource_type: ResourceType = ResourceType.content,
-    ) -> dict[str, Any]:
-        return await self.__api(
-            (
-                f"/managed/entry/{resource_type}/{space_name}/{subpath}/{shortname}"
-                f"?retrieve_json_payload=true&retrieve_attachments={retrieve_attachments}"
-            ),
-            RequestMethod.get,
-        )
-
-    async def read_json_payload(
-        self, space_name: Space, subpath: str, shortname: str
-    ) -> dict[str, Any]:
-        return await self.__api(
-            f"/managed/payload/content/{space_name}/{subpath}/{shortname}.json",
-            RequestMethod.get,
-        )
-
-    async def query(
-        self,
-        space_name: Space,
-        subpath: str,
-        search: str = "",
-        filter_schema_names: list[str] = [],
-        **kwargs: Any,
-    ) -> dict[str, Any]:
-        return await self.__api(
-            "/managed/query",
-            RequestMethod.post,
-            {
-                "type": "search",
-                "space_name": space_name,
-                "subpath": subpath,
-                "retrieve_json_payload": True,
-                "filter_schema_names": filter_schema_names,
-                "search": search,
-                **kwargs,
-            },
-        )
-
-    async def update(
-        self,
-        space_name: Space,
-        subpath: str,
-        shortname: str,
-        attributes: dict[str, Any],
-        resource_type: ResourceType = ResourceType.content,
-    ) -> dict[str, Any]:
-        return await self.__request(
-            space_name,
-            subpath,
-            shortname,
-            RequestType.update,
-            attributes,
-            resource_type,
-        )
-
-    async def progress_ticket(
-        self,
-        space_name: Space,
-        subpath: str,
-        shortname: str,
-        action: str,
-        cancellation_reasons: CancellationReason | None = None,
-    ) -> dict[str, Any]:
-        request_body = None
-        if cancellation_reasons:
-            request_body = {"resolution": cancellation_reasons}
-        return await self.__api(
-            (f"/managed/progress-ticket/{space_name}/{subpath}/{shortname}/{action}"),
-            RequestMethod.put,
-            json=request_body,
-        )
-
-    async def delete(
-        self,
-        space_name: Space,
-        subpath: str,
-        shortname: str,
-        resource_type: ResourceType = ResourceType.content,
-    ) -> dict[str, Any]:
-        json: dict[str, Any] = {
+    async def delete(self, space_name: Space, subpath, shortname):
+        endpoint = "/managed/request"
+        resource_type = "content"
+        json = {
             "space_name": space_name,
-            "request_type": RequestType.delete,
+            "request_type": "delete",
             "records": [
                 {
                     "resource_type": resource_type,
@@ -284,7 +127,111 @@ class DMart:
                 }
             ],
         }
-        return await self.__api("/managed/request", RequestMethod.post, json)
+        return await self.__api(endpoint, json)
+
+    # Used in user and gift
+    async def get_payload(self, space_name: Space, subpath, shortname):
+        endpoint = f"{settings.dmart_url}/managed/payload/content/{space_name.value}/{subpath}/{shortname}.json"
+        for _ in range(3):
+            try:
+                async with aiohttp.ClientSession(
+                    headers=self.get_headers()
+                ) as requests:
+                    response = await requests.get(endpoint)
+                    json = await response.json()
+
+                    if (
+                        json.get("status", None) == "failed"
+                        and json.get("error", {}).get("type", None) == "jwtauth"
+                    ):
+                        await self.login()
+                        raise ConnectionError()
+                    if response.status != 200:
+                        return None
+                    return json
+            except ConnectionError:
+                continue
+
+    async def query_user(self, space_name: Space, mssidn):
+        endpoint = f"/managed/entry/content/{space_name.value}/users/{mssidn}?retrieve_json_payload=true"
+        return await self.__api(endpoint)
+
+    async def search(
+        self, space_name: Space, subpath, content, filter_schema_names=[], **kwargs
+    ) -> dict:
+        endpoint = f"/managed/query"
+        json = {
+            "type": "search",
+            "space_name": space_name.value,
+            "subpath": subpath,
+            "retrieve_json_payload": True,
+            "filter_schema_names": filter_schema_names,
+            "search": content,
+            **kwargs,
+        }
+        return await self.__api(endpoint, json)
+
+    async def query(self, space_name: Space, subpath, filter_shortnames=[]):
+        endpoint = "/managed/query"
+        json = {
+            "type": "subpath",
+            "space_name": space_name,
+            "subpath": subpath,
+            "filter_shortnames": filter_shortnames,
+            "retrieve_json_payload": True,
+        }
+        return await self.__api(endpoint, json)
+
+    # User in user
+    async def update(
+        self,
+        space_name: Space,
+        subpath,
+        shortname,
+        schema: Schema,
+        payload: dict[str, Any],
+        displayname: dict[str, str] | None = None,
+    ):
+        attributes: dict[str, Any] = {
+            "payload": {
+                "schema_shortname": schema,
+                "content_type": "json",
+                "body": payload,
+            }
+        }
+        if displayname is not None and displayname.get("en"):
+            attributes["displayname"] = displayname
+
+        return await self.__request(
+            space_name, subpath, shortname, RequestType.update, attributes
+        )
+
+    # Used in user, gift, offer, voucher and subaccount
+    async def create(
+        self,
+        space_name: Space,
+        subpath,
+        schema: Schema,
+        payload: dict[str, Any],
+        shortname=None,
+        displayname=None,
+    ):
+        attributes = {
+            "is_active": True,
+            "displayname": displayname,
+            "payload": {
+                "schema_shortname": schema,
+                "content_type": "json",
+                "body": payload,
+            },
+        }
+        if shortname is None:
+            attributes["uuid"] = str(uuid4())
+            shortname = attributes["uuid"][:8]
+
+        return await self.__request(
+            space_name, subpath, shortname, RequestType.create, attributes
+        )
 
 
 dmart = DMart()

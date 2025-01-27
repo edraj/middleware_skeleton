@@ -1,63 +1,45 @@
 #!/usr/bin/env -S BACKEND_ENV=config.env python3
-""" FastApi Main module """
-
+""" Main module """
+from starlette.datastructures import UploadFile
+from contextlib import asynccontextmanager
 import asyncio
 import json
+from os import getpid
 import sys
 import time
 import traceback
 from datetime import datetime
 from typing import Any
-from asgi_correlation_id import CorrelationIdMiddleware
+from urllib.parse import urlparse, quote
+from jsonschema.exceptions import ValidationError as SchemaValidationError
+from pydantic import ValidationError
+
+from models import api
+from utils.git_info import git_info
+from utils.middleware import CustomRequestMiddleware, ChannelMiddleware
+from utils.jwt import JWTBearer
 from fastapi import Depends, FastAPI, Request, Response, status
+from utils.logger import logging_schema
+from fastapi.logger import logger
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from hypercorn.asyncio import serve
 from hypercorn.config import Config
+from starlette.concurrency import iterate_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from urllib.parse import quote
-from utils.logger import logging_schema
-from pydantic import ValidationError
-from contextlib import asynccontextmanager
-from api.order.router import router as orderRouter
-
-from api.schemas.response import ApiException, ApiResponse, Error
-from models.base.enums import Status
-
-from utils.response import MainResponse
-from fastapi.logger import logger
 from utils.settings import settings
-import socket
-import subprocess
-from api.auth.router import router as auth
-from api.user.router import router as user_routers
-from api.notification.router import router as notification_routers
+from asgi_correlation_id import CorrelationIdMiddleware
+from utils.internal_error_code import InternalErrorCode
+import json_logging
+from api.dummy.router import router as dummy_router
 
-service_start_time: str = ""
-version: str = "unknown"
-branch_name: str = "unknown"
-server_hostname: str = "unknown"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print('{"stage":"starting up"}')
     logger.info("Starting up")
-    global service_start_time
-    global version
-    global branch_name
-    global server_hostname
-    service_start_time = datetime.now().isoformat()
-    branch_name_cmd = "git rev-parse --abbrev-ref HEAD"
-    result = subprocess.run(
-        [branch_name_cmd], capture_output=True, text=True, shell=True
-    )
-    branch_name = result.stdout.split("\n")[0]
-    git_hash_cmd = "git rev-parse --short HEAD"
-    result = subprocess.run([git_hash_cmd], capture_output=True, text=True, shell=True)
-    version = result.stdout.split("\n")[0]
-    server_hostname = socket.gethostname()
+    print('{"stage":"starting up"}')
 
     openapi_schema = app.openapi()
     paths = openapi_schema["paths"]
@@ -70,229 +52,350 @@ async def lifespan(app: FastAPI):
 
     yield
 
+
     logger.info("Application shutting down")
     print('{"stage":"shutting down"}')
 
 
+json_logging.init_fastapi(enable_json=True)
 app = FastAPI(
     lifespan=lifespan,
-    title="Middleware API",
-    description="""Middleware uservice""",
-    default_response_class=MainResponse,
-    swagger_ui_parameters={"defaultModelsExpandDepth": -1},
-    version="0.0.1",
+    title="Datamart API",
+    description="Structured Content Management System",
+    version=str(git_info()["tag"]),
     redoc_url=None,
     docs_url=f"{settings.base_path}/docs",
     openapi_url=f"{settings.base_path}/openapi.json",
     servers=[{"url": f"{settings.base_path}/"}],
+    contact={
+        "name": "Kefah T. Issa",
+        "url": "https://dmart.cc",
+        "email": "kefah.issa@gmail.com",
+    },
+    license_info={
+        "name": "GNU Affero General Public License v3+",
+        "url": "https://www.gnu.org/licenses/agpl-3.0.en.html",
+    },
+    swagger_ui_parameters={"defaultModelsExpandDepth": -1},
+    openapi_tags=[
+        {"name": "user", "description": "User registration, login, profile and delete"},
+        {
+            "name": "managed",
+            "description": "Login-only content management api and media upload",
+        },
+        {
+            "name": "public",
+            "description": "Public api for query and GET access to media",
+        },
+    ],
 )
 
+json_logging.init_request_instrument(app)
 
 async def capture_body(request: Request):
     request.state.request_body = {}
+
     if (
-        request.method == "POST"
-        and request.headers.get("content-type") == "application/json"
+            request.method == "POST"
+            and "application/json" in request.headers.get("content-type", "")
     ):
         request.state.request_body = await request.json()
+
+    if (
+            request.method == "POST"
+            and request.headers.get("content-type")
+            and "multipart/form-data" in request.headers.get("content-type", [])
+    ):
+        form = await request.form()
+        for field in form:
+            one = form[field]
+            if isinstance(one, str):
+                request.state.request_body[field] = form.get(field)
+            elif isinstance(one, UploadFile):
+                request.state.request_body[field] = {
+                    "name": one.filename,
+                    "content_type": one.content_type,
+                }
 
 
 @app.exception_handler(StarletteHTTPException)
 async def my_exception_handler(_, exception):
-    return MainResponse(
+    return JSONResponse(
         content=exception.detail,
         status_code=exception.status_code,
+        headers={"correlation_id": json_logging.get_correlation_id()},
     )
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(_, exc: RequestValidationError):
+async def validation_exception_handler(_: Request, exc: RequestValidationError):
     err = jsonable_encoder({"detail": exc.errors()})["detail"]
-    raise ApiException(
+    raise api.Exception(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        error=Error(code=422, type="validation", message=err),
+        error=api.Error(
+            code=InternalErrorCode.UNPROCESSABLE_ENTITY, type="validation", message="Validation error [1]", info=err
+        ),
     )
 
 
-@app.middleware("http")
-async def middle(request: Request, call_next):
-    """Wrapper function to manage errors and logging"""
-    if request.url._url.endswith("/docs") or request.url._url.endswith("/openapi.json"):
-        return await call_next(request)
+app.add_middleware(CustomRequestMiddleware)
+app.add_middleware(ChannelMiddleware)
 
-    start_time = time.time()
-    response_body: str = ""
-    exception_data: dict[str, Any] | None = None
-    # The api_key is enforced only if it set to none-empty value
-    if not settings.api_key or (
-        "key" in request.query_params
-        and settings.api_key == request.query_params["key"]
-    ):
-        try:
-            response = await call_next(request)
-            response.headers["path"] = request.url.path
 
-        except ApiException as ex:
-            response = JSONResponse(
-                status_code=ex.status_code,
-                content=jsonable_encoder(
-                    ApiResponse(status=Status.failed, error=ex.error)
-                ),
-            )
-            stack = [
-                {
-                    "file": frame.f_code.co_filename,
-                    "function": frame.f_code.co_name,
-                    "line": lineno,
-                }
-                for frame, lineno in traceback.walk_tb(ex.__traceback__)
-                if "site-packages" not in frame.f_code.co_filename
-            ]
-            exception_data = {"props": {"exception": str(ex), "stack": stack}}
-            response_body = json.loads(response.body.decode())
-        except ValidationError as e:
-            stack = [
-                {
-                    "file": frame.f_code.co_filename,
-                    "function": frame.f_code.co_name,
-                    "line": lineno,
-                }
-                for frame, lineno in traceback.walk_tb(e.__traceback__)
-                if "site-packages" not in frame.f_code.co_filename
-            ]
-            exception_data = {"props": {"exception": str(e), "stack": stack}}
-            response = JSONResponse(
-                status_code=422,
-                content={
-                    "status": "failed",
-                    "error": {
-                        "code": 422,
-                        "type": "validation",
-                        "message": "Validation error [2]",
-                        "info": e.errors(),
-                    },
-                },
-            )
-            response_body = json.loads(response.body.decode())
-        except Exception:
-            exception_message = ""
-            stack = None
-            if ee := sys.exc_info()[1]:
-                stack = [
-                    {
-                        "file": frame.f_code.co_filename,
-                        "function": frame.f_code.co_name,
-                        "line": lineno,
-                    }
-                    for frame, lineno in traceback.walk_tb(ee.__traceback__)
-                    if "site-packages" not in frame.f_code.co_filename
-                ]
-                exception_message = str(ee)
-                exception_data = {"props": {"exception": str(ee), "stack": stack}}
-
-            error_log = {"code": 99, "message": exception_message}
-            if settings.debug_enabled:
-                error_log["stack"] = stack
-            response = JSONResponse(
-                status_code=500,
-                content={
-                    "status": "failed",
-                    "error": error_log,
-                },
-            )
-            response_body = json.loads(response.body.decode())
-            logger.error("INTERNAL ERROR", extra={"props": exception_data})
-
-    else:
-        response = MainResponse(
-            headers={
-                "path": request.url.path,
-            },
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content=jsonable_encoder(
-                ApiResponse(
-                    status=Status.failed,
-                    error=Error(type="bad_request", code=112, message="bad_request."),
-                )
-            ),
-        )
-        response_body = json.loads(response.body.decode())
-
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
-    response.headers["X-Server-Time"] = datetime.now().isoformat()
+def set_middleware_extra(request, response, start_time, user_shortname, exception_data, response_body):
     extra = {
         "props": {
+            "timestamp": start_time,
             "duration": 1000 * (time.time() - start_time),
+            "server": settings.servername,
+            "process_id": getpid(),
+            "user_shortname": user_shortname,
             "request": {
+                "url": request.url._url,
                 "verb": request.method,
                 "path": quote(str(request.url.path)),
-                "headers": dict(request.headers.items()),
                 "query_params": dict(request.query_params.items()),
-                "body": request.state.request_body
-                if hasattr(request.state, "request_body")
-                else {},
+                "headers": dict(request.headers.items()),
             },
             "response": {
                 "headers": dict(response.headers.items()),
-                "body": response_body,
+                "http_status": response.status_code,
             },
-            "http_status": response.status_code,
         }
     }
 
     if exception_data is not None:
         extra["props"]["exception"] = exception_data
-    if hasattr(request.state, "request_body"):
+    if (hasattr(request.state, "request_body") and isinstance(extra, dict) and isinstance(extra["props"], dict)
+            and isinstance(extra["props"]["request"], dict)):
         extra["props"]["request"]["body"] = request.state.request_body
-    if response_body:
+    if (response_body and isinstance(extra, dict) and isinstance(extra["props"], dict)
+            and isinstance(extra["props"]["response"], dict)):
         extra["props"]["response"]["body"] = response_body
 
-    request.state.extra = extra
-    if not response.status_code == 200:
-        logger.info("Processed", extra=extra)
+    return extra
+
+
+def set_middleware_response_headers(request, response):
+    referer = request.headers.get(
+        "referer",
+        request.headers.get("origin",
+                            request.headers.get("x-forwarded-proto", "http")
+                            + "://"
+                            + request.headers.get(
+                                "x-forwarded-host", f"{settings.listening_host}:{settings.listening_port}"
+                            )),
+    )
+    origin = urlparse(referer)
+    response.headers[
+        "Access-Control-Allow-Origin"
+    ] = f"{origin.scheme}://{origin.netloc}"
+
+    # if "localhost" in response.headers["Access-Control-Allow-Origin"]:
+    #     response.headers["Access-Control-Allow-Origin"] = "*"
+
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Headers"] = "content-type, charset, authorization, accept-language, content-length"
+    response.headers["Access-Control-Max-Age"] = "600"
+    response.headers[
+        "Access-Control-Allow-Methods"
+    ] = "OPTIONS, DELETE, POST, GET, PATCH, PUT"
+
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    response.headers["x-server-time"] = datetime.now().isoformat()
+    response.headers["Access-Control-Expose-Headers"] = "x-server-time"
     return response
 
 
-@app.get("/", include_in_schema=False, dependencies=[Depends(capture_body)])
-async def root():
-    """Micro-service card identifier"""
+def mask_sensitive_data(data):
+    if isinstance(data, dict):
+        return {k: mask_sensitive_data(v) if k not in ['password', 'access_token', 'refresh_token', 'auth_token'] else '******' for k, v in data.items()}
+    elif isinstance(data, list):
+        return [mask_sensitive_data(item) for item in data]
+    elif isinstance(data, str) and 'auth_token' in data:
+        return '******'
+    return data
 
-    return {
-        "name": "DMW",
-        "type": "microservice",
-        "description": "Dmart Middleware",
-        "status": "success",
-        "start_time": service_start_time,
-        "current_time": datetime.now(),
-        "version": version,
-        "branch_name": branch_name,
-        "server": server_hostname,
-    }
+
+def set_logging(response, extra, request, exception_data):
+    extra = mask_sensitive_data(extra)
+    if 400 <= response.status_code < 500:
+        logger.warning("Served request", extra=extra)
+    elif response.status_code >= 500 or exception_data is not None:
+        logger.error("Served request", extra=extra)
+    elif request.method != "OPTIONS":  # Do not log OPTIONS request, to reduce excessive logging
+        logger.info("Served request", extra=extra)
+
+
+def set_stack(e):
+    return [
+        {
+            "file": frame.f_code.co_filename,
+            "function": frame.f_code.co_name,
+            "line": lineno,
+        }
+        for frame, lineno in traceback.walk_tb(e.__traceback__)
+        if "site-packages" not in frame.f_code.co_filename
+    ]
+
+@app.middleware("http")
+async def middle(request: Request, call_next):
+    """Wrapper function to manage errors and logging"""
+    if request.url._url.endswith("/docs") or request.url._url.endswith("openapi.json"):
+        return await call_next(request)
+
+    start_time = time.time()
+    response_body: str | dict = {}
+    exception_data: dict[str, Any] | None = None
+
+
+    try:
+        response = await asyncio.wait_for(call_next(request), timeout=settings.request_timeout)
+        response.headers["correlation_id"] = json_logging.get_correlation_id()
+        raw_response = [section async for section in response.body_iterator]
+        response.body_iterator = iterate_in_threadpool(iter(raw_response))
+        raw_data = b"".join(raw_response)
+        if raw_data:
+            try:
+                response_body = json.loads(raw_data)
+            except Exception:
+                response_body = {}
+    except asyncio.TimeoutError:
+        response = JSONResponse(content={'status':'failed',
+            'error': {"code":504, "message": 'Request processing time excedeed limit'}},
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT)
+        response_body = json.loads(str(response.body, 'utf8'))
+    except api.Exception as e:
+        response = JSONResponse(
+            headers={
+                "correlation_id": json_logging.get_correlation_id(),
+            },
+            status_code=e.status_code,
+            content=jsonable_encoder(
+                api.Response(status=api.Status.failed, error=e.error)
+            ),
+        )
+        stack = set_stack(e)
+        exception_data = {"props": {"exception": str(e), "stack": stack}}
+        response_body = json.loads(str(response.body, 'utf8'))
+    except ValidationError as e:
+        stack = set_stack(e)
+        exception_data = {"props": {"exception": str(e), "stack": stack}}
+        response = JSONResponse(
+            headers={
+                "correlation_id": json_logging.get_correlation_id(),
+            },
+            status_code=422,
+            content={
+                "status": "failed",
+                "error": {
+                    "type": "validation",
+                    "code": 422,
+                    "message": "Validation error [2]",
+                    "info": jsonable_encoder(e.errors()),
+                },
+            },
+        )
+        response_body = json.loads(str(response.body, 'utf8'))
+    except SchemaValidationError as e:
+        stack = set_stack(e)
+        exception_data = {"props": {"exception": str(e), "stack": stack}}
+        response = JSONResponse(
+            headers={
+                "correlation_id": json_logging.get_correlation_id(),
+            },
+            status_code=400,
+            content={
+                "status": "failed",
+                "error": {
+                    "type": "validation",
+                    "code": 422,
+                    "message": "Validation error [3]",
+                    "info": [{
+                        "loc": list(e.path),
+                        "msg": e.message
+                    }],
+                },
+            },
+        )
+        response_body = json.loads(str(response.body, 'utf8'))
+    except Exception:
+        exception_message = ""
+        stack = None
+        if ee := sys.exc_info()[1]:
+            stack = set_stack(ee)
+            exception_message = str(ee)
+            exception_data = {"props": {"exception": str(ee), "stack": stack}}
+
+        error_log = {"type": "general", "code": 99, "message": exception_message}
+        if settings.debug_enabled:
+            error_log["stack"] = stack
+        response = JSONResponse(
+            headers={
+                "correlation_id": json_logging.get_correlation_id(),
+            },
+            status_code=500,
+            content={
+                "status": "failed",
+                "error": error_log,
+            },
+        )
+        response_body = json.loads(str(response.body, 'utf8'))
+
+    response = set_middleware_response_headers(request, response)
+
+    user_shortname = "guest"
+    try:
+        user_shortname = str(await JWTBearer().__call__(request))
+    except Exception:
+        pass
+
+    extra = set_middleware_extra(request, response, start_time, user_shortname, exception_data, response_body)
+
+    set_logging(response, extra, request, exception_data)
+
+    return response
 
 
 app.add_middleware(
     CorrelationIdMiddleware,
-    header_name="X-Correlation-ID",
+    header_name='X-Correlation-ID',
     update_request_header=False,
+    validator=None,
 )
 
 
-app.include_router(
-    auth, prefix="/auth", tags=["auth"], dependencies=[Depends(capture_body)]
-)
+@app.get("/", include_in_schema=False)
+async def root():
+    return {"status": "success", "message": "DMART API"}
+
+
+@app.get("/spaces-backup", include_in_schema=False)
+async def space_backup(key: str):
+    if not key or key != "ABC":
+        return api.Response(
+            status=api.Status.failed,
+            error=api.Error(type="git", code=InternalErrorCode.INVALID_APP_KEY, message="Api key is invalid"),
+        )
+
+    import subprocess
+
+    cmd = "/usr/bin/bash -c 'cd .. && ./spaces-backup.sh'"
+
+    result_stdout, result_stderr = subprocess.Popen(
+        cmd.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    ).communicate()
+    attributes = {
+        "stdout": result_stdout.decode().split("\n"),
+        "stderr": result_stderr.decode().split("\n"),
+    }
+    return api.Response(status=api.Status.success, attributes=attributes)
+
 
 app.include_router(
-    user_routers, prefix="/user", tags=["user"], dependencies=[Depends(capture_body)]
-)
-
-app.include_router(
-    notification_routers, prefix="/notification", tags=["notification"], dependencies=[Depends(capture_body)]
-)
-
-app.include_router(
-    orderRouter, prefix="/order", tags=["order"], dependencies=[Depends(capture_body)]
+    dummy_router, prefix="/dummy", tags=["dummy"], dependencies=[Depends(capture_body)]
 )
 
 
@@ -301,19 +404,18 @@ async def myoptions():
     return Response(status_code=status.HTTP_200_OK)
 
 
-@app.get("/{x:path}", include_in_schema=False, dependencies=[Depends(capture_body)])
-@app.post("/{x:path}", include_in_schema=False, dependencies=[Depends(capture_body)])
-@app.put("/{x:path}", include_in_schema=False, dependencies=[Depends(capture_body)])
-@app.patch("/{x:path}", include_in_schema=False, dependencies=[Depends(capture_body)])
-@app.delete("/{x:path}", include_in_schema=False, dependencies=[Depends(capture_body)])
-async def catchall():
-    raise ApiException(
+@app.get("/{x:path}", include_in_schema=False)
+@app.post("/{x:path}", include_in_schema=False)
+@app.put("/{x:path}", include_in_schema=False)
+@app.patch("/{x:path}", include_in_schema=False)
+@app.delete("/{x:path}", include_in_schema=False)
+async def catchall() -> None:
+    raise api.Exception(
         status_code=status.HTTP_404_NOT_FOUND,
-        error=Error(
-            type="catchall", code=230, message="Requested method or path is invalid"
+        error=api.Error(
+            type="catchall", code=InternalErrorCode.INVALID_ROUTE, message="Requested method or path is invalid"
         ),
     )
-
 
 async def main():
     config = Config()
@@ -322,8 +424,13 @@ async def main():
 
     config.logconfig_dict = logging_schema
     config.errorlog = logger
-    await serve(app, config)  # type: ignore
+
+    try:
+        await serve(app, config)  # type: ignore
+    except OSError as e:
+        print("[!1server]", e)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main())  # type: ignore
+

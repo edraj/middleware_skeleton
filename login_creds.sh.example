@@ -1,0 +1,3 @@
+#!/bin/bash
+
+export TESTUSER='{"shortname":"AAAA","password":"BBBB"}'
