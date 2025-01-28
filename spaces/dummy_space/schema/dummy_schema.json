@@ -1,0 +1,1 @@
+{"title": "Dummy", "type": "object", "properties": {"mere_string": {"type": "string"}, "mere_int": {"type": "integer"}, "mere_float": {"type": "number"}, "mere_bool": {"type": "boolean"}, "mere_dict": {"type": "object", "additionalProperties": true}}, "required": ["mere_string", "mere_int", "mere_float", "mere_bool", "mere_dict"]}
