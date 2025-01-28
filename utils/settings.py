@@ -8,14 +8,17 @@ class Settings(BaseSettings):
 
     # Logging settings
     log_handlers: list[str] = ['console','file'] 
-    log_file: str = "../logs/delivery.ljson.log"
+    log_file: str = "./logs/delivery.ljson.log"
 
     # API settings
     app_name: str = "Dmart MicroService"
     listening_host: str = "0.0.0.0"
     listening_port: int = 8989
+    request_timeout: int = 35  # In seconds the time of dmart requests.
+    channels: list = []
+    servername: str = ""  # This is for print purposes only.
 
-    base_path: str = "/"
+    base_path: str = ""
 
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"

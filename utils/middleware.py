@@ -53,7 +53,7 @@ class ChannelMiddleware:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] not in ["http", "websocket"] or not settings.enable_channel_auth:
+        if scope["type"] not in ["http", "websocket"]:
             await self.app(scope, receive, send)
             return
 

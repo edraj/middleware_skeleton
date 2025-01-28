@@ -33,7 +33,7 @@ from asgi_correlation_id import CorrelationIdMiddleware
 from utils.internal_error_code import InternalErrorCode
 import json_logging
 from api.dummy.router import router as dummy_router
-from utils.dmart import dmart
+# from utils.dmart import dmart
 
 
 
@@ -41,7 +41,12 @@ from utils.dmart import dmart
 async def lifespan(app: FastAPI):
     logger.info("Starting up")
     print('{"stage":"starting up"}')
-    dmart.connect()
+
+    # try:
+    #     await dmart.create_session_pool()
+    #     await dmart.connect()
+    # except Exception:
+    #     sys.exit("Failed to connect to DMART")
 
     openapi_schema = app.openapi()
     paths = openapi_schema["paths"]
@@ -78,20 +83,9 @@ app = FastAPI(
         "url": "https://www.gnu.org/licenses/agpl-3.0.en.html",
     },
     swagger_ui_parameters={"defaultModelsExpandDepth": -1},
-    openapi_tags=[
-        {"name": "user", "description": "User registration, login, profile and delete"},
-        {
-            "name": "managed",
-            "description": "Login-only content management api and media upload",
-        },
-        {
-            "name": "public",
-            "description": "Public api for query and GET access to media",
-        },
-    ],
+    openapi_tags=[],
 )
 
-json_logging.init_request_instrument(app)
 
 async def capture_body(request: Request):
     request.state.request_body = {}
@@ -251,7 +245,6 @@ async def middle(request: Request, call_next):
     response_body: str | dict = {}
     exception_data: dict[str, Any] | None = None
 
-
     try:
         response = await asyncio.wait_for(call_next(request), timeout=settings.request_timeout)
         response.headers["correlation_id"] = json_logging.get_correlation_id()
@@ -265,7 +258,7 @@ async def middle(request: Request, call_next):
                 response_body = {}
     except asyncio.TimeoutError:
         response = JSONResponse(content={'status':'failed',
-            'error': {"code":504, "message": 'Request processing time excedeed limit'}},
+            'error': {"code":504, "message": 'Request processing time exceeded limit'}},
             status_code=status.HTTP_504_GATEWAY_TIMEOUT)
         response_body = json.loads(str(response.body, 'utf8'))
     except api.Exception as e:
@@ -322,7 +315,8 @@ async def middle(request: Request, call_next):
             },
         )
         response_body = json.loads(str(response.body, 'utf8'))
-    except Exception:
+    except Exception as e:
+        print(e)
         exception_message = ""
         stack = None
         if ee := sys.exc_info()[1]:
@@ -344,6 +338,7 @@ async def middle(request: Request, call_next):
             },
         )
         response_body = json.loads(str(response.body, 'utf8'))
+
 
     response = set_middleware_response_headers(request, response)
 
@@ -370,7 +365,7 @@ app.add_middleware(
 
 @app.get("/", include_in_schema=False)
 async def root():
-    return {"status": "success", "message": "DMART API"}
+    return {"status": "success", "message": "DMART Microservice API"}
 
 
 @app.get("/spaces-backup", include_in_schema=False)
@@ -417,6 +412,9 @@ async def catchall() -> None:
             type="catchall", code=InternalErrorCode.INVALID_ROUTE, message="Requested method or path is invalid"
         ),
     )
+
+
+json_logging.init_request_instrument(app)
 
 async def main():
     config = Config()
