@@ -1,10 +1,18 @@
 import json
 import logging
 import logging.config
+import os
+
 from utils.settings import settings
 
 
 class CustomFormatter(logging.Formatter):
+    def __init__(self):
+        log_dir = os.path.dirname(settings.log_file)
+        if not os.path.exists(log_dir):
+            os.mkdir(log_dir)
+        super().__init__()
+
     def format(self, record):
         correlation_id = getattr(record, "correlation_id", "")
         if correlation_id == "ROOT" and getattr(record, "props", None):
@@ -18,9 +26,9 @@ class CustomFormatter(logging.Formatter):
             "props": getattr(record, "props", ""),
             "thread": record.threadName,
             "process": record.process,
-            "pathname": record.pathname,
-            "lineno": record.lineno,
-            "funcName": record.funcName,
+            # "pathname": record.pathname,
+            # "lineno": record.lineno,
+            # "funcName": record.funcName,
         }
         return json.dumps(data)
 
@@ -49,8 +57,8 @@ logging_schema : dict = {
             "filters": ["correlation_id"],
             "filename": settings.log_file,
             "backupCount": 5,
-            "maxBytes": 1048576,
-            "use_gzip": True,
+            "maxBytes": 0x10000000,
+            "use_gzip": False,
             "formatter": "json",
         },
     },
@@ -66,6 +74,6 @@ logging_schema : dict = {
 
 def changeLogFile(log_file: str | None = None) -> None:
     global logging_schema
-    if (log_file and "handlers" in logging_schema and "file" in logging_schema["handlers"] 
+    if (log_file and "handlers" in logging_schema and "file" in logging_schema["handlers"]
         and "filename" in logging_schema["handlers"]["file"]):
         logging_schema["handlers"]["file"]["filename"] = log_file
