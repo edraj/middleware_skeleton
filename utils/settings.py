@@ -8,7 +8,7 @@ class Settings(BaseSettings):
 
     # Logging settings
     log_handlers: list[str] = ['console','file'] 
-    log_file: str = "./logs/delivery.ljson.log"
+    log_file: str = "./logs/dmart.ljson.log"
     debug_enabled: bool = True
 
     # API settings
