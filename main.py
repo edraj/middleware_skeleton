@@ -33,6 +33,7 @@ from asgi_correlation_id import CorrelationIdMiddleware
 from utils.internal_error_code import InternalErrorCode
 import json_logging
 from api.dummy.router import router as dummy_router
+from utils.dmart import dmart
 
 
 
@@ -40,6 +41,7 @@ from api.dummy.router import router as dummy_router
 async def lifespan(app: FastAPI):
     logger.info("Starting up")
     print('{"stage":"starting up"}')
+    dmart.connect()
 
     openapi_schema = app.openapi()
     paths = openapi_schema["paths"]
@@ -51,7 +53,6 @@ async def lifespan(app: FastAPI):
     app.openapi_schema = openapi_schema
 
     yield
-
 
     logger.info("Application shutting down")
     print('{"stage":"shutting down"}')
