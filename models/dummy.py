@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 
-class Dummy(BaseModel):
+class DummyData(BaseModel):
     mere_string: str
     mere_int: int
     mere_float: float

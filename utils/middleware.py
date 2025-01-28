@@ -4,8 +4,8 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.requests import Request
 from utils.internal_error_code import InternalErrorCode
 from utils.settings import settings
-import models.api as api
 from fastapi import status
+from pydmart.service import DmartException, Error as DmartError
 
 REQUEST_DATA_CTX_KEY = "request_data"
 
@@ -63,9 +63,9 @@ class ChannelMiddleware:
             for channel in settings.channels:
                 for pattern in channel["allowed_api_patterns"]:
                     if pattern.search(request.scope['path']):
-                        raise api.Exception(
+                        raise DmartException(
                             status_code=status.HTTP_403_FORBIDDEN,
-                            error=api.Error(
+                            error=DmartError(
                                 type="channel_auth", code=InternalErrorCode.NOT_ALLOWED, message="Requested method or path is forbidden"
                             ),
                         )
@@ -79,9 +79,9 @@ class ChannelMiddleware:
                 break
 
         if not request_channel:
-            raise api.Exception(
+            raise DmartException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                error=api.Error(
+                error=DmartError(
                     type="channel_auth", code=InternalErrorCode.NOT_ALLOWED, message="Requested method or path is forbidden [2]"
                 ),
             )
@@ -91,9 +91,9 @@ class ChannelMiddleware:
                 await self.app(scope, receive, send)
                 return
             
-        raise api.Exception(
+        raise DmartException(
             status_code=status.HTTP_403_FORBIDDEN,
-            error=api.Error(
+            error=DmartError(
                 type="channel_auth", code=InternalErrorCode.NOT_ALLOWED, message="Requested method or path is forbidden [3]"
             ),
         )

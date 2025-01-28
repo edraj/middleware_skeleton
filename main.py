@@ -14,7 +14,6 @@ from urllib.parse import urlparse, quote
 from jsonschema.exceptions import ValidationError as SchemaValidationError
 from pydantic import ValidationError
 
-from models import api
 from utils.git_info import git_info
 from utils.middleware import CustomRequestMiddleware, ChannelMiddleware
 from utils.jwt import JWTBearer
@@ -33,8 +32,9 @@ from asgi_correlation_id import CorrelationIdMiddleware
 from utils.internal_error_code import InternalErrorCode
 import json_logging
 from api.dummy.router import router as dummy_router
-# from utils.dmart import dmart
-
+from pydmart.service import DmartException, Error as DmartError, Status as DmartStatus,\
+    DmartResponse
+from utils.dmart import dmart
 
 
 @asynccontextmanager
@@ -42,11 +42,11 @@ async def lifespan(app: FastAPI):
     logger.info("Starting up")
     print('{"stage":"starting up"}')
 
-    # try:
-    #     await dmart.create_session_pool()
-    #     await dmart.connect()
-    # except Exception:
-    #     sys.exit("Failed to connect to DMART")
+    try:
+        await dmart.create_session_pool()
+        await dmart.connect()
+    except Exception:
+        sys.exit("Failed to connect to DMART")
 
     openapi_schema = app.openapi()
     paths = openapi_schema["paths"]
@@ -125,9 +125,9 @@ async def my_exception_handler(_, exception):
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(_: Request, exc: RequestValidationError):
     err = jsonable_encoder({"detail": exc.errors()})["detail"]
-    raise api.Exception(
+    raise DmartException(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        error=api.Error(
+        error=DmartError(
             code=InternalErrorCode.UNPROCESSABLE_ENTITY, type="validation", message="Validation error [1]", info=err
         ),
     )
@@ -261,14 +261,14 @@ async def middle(request: Request, call_next):
             'error': {"code":504, "message": 'Request processing time exceeded limit'}},
             status_code=status.HTTP_504_GATEWAY_TIMEOUT)
         response_body = json.loads(str(response.body, 'utf8'))
-    except api.Exception as e:
+    except DmartException as e:
         response = JSONResponse(
             headers={
                 "correlation_id": json_logging.get_correlation_id(),
             },
             status_code=e.status_code,
             content=jsonable_encoder(
-                api.Response(status=api.Status.failed, error=e.error)
+                DmartResponse(status=DmartStatus.failed, error=e.error)
             ),
         )
         stack = set_stack(e)
@@ -316,7 +316,6 @@ async def middle(request: Request, call_next):
         )
         response_body = json.loads(str(response.body, 'utf8'))
     except Exception as e:
-        print(e)
         exception_message = ""
         stack = None
         if ee := sys.exc_info()[1]:
@@ -371,9 +370,9 @@ async def root():
 @app.get("/spaces-backup", include_in_schema=False)
 async def space_backup(key: str):
     if not key or key != "ABC":
-        return api.Response(
-            status=api.Status.failed,
-            error=api.Error(type="git", code=InternalErrorCode.INVALID_APP_KEY, message="Api key is invalid"),
+        return DmartResponse(
+            status=DmartStatus.failed,
+            error=DmartError(type="git", code=InternalErrorCode.INVALID_APP_KEY, message="Api key is invalid"),
         )
 
     import subprocess
@@ -387,7 +386,7 @@ async def space_backup(key: str):
         "stdout": result_stdout.decode().split("\n"),
         "stderr": result_stderr.decode().split("\n"),
     }
-    return api.Response(status=api.Status.success, attributes=attributes)
+    return DmartResponse(status=DmartStatus.success, attributes=attributes)
 
 
 app.include_router(
@@ -406,9 +405,9 @@ async def myoptions():
 @app.patch("/{x:path}", include_in_schema=False)
 @app.delete("/{x:path}", include_in_schema=False)
 async def catchall() -> None:
-    raise api.Exception(
+    raise DmartException(
         status_code=status.HTTP_404_NOT_FOUND,
-        error=api.Error(
+        error=DmartError(
             type="catchall", code=InternalErrorCode.INVALID_ROUTE, message="Requested method or path is invalid"
         ),
     )
