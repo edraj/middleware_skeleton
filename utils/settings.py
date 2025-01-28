@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     # Logging settings
     log_handlers: list[str] = ['console','file'] 
     log_file: str = "./logs/delivery.ljson.log"
+    debug_enabled: bool = True
 
     # API settings
     app_name: str = "Dmart MicroService"

@@ -1,10 +1,10 @@
-from pydmart.service import ResourceType, DmartException
+from pydmart.service import ResourceType, DmartException, DmartResponse
 
 from models.dummy import DummyData
 from utils.dmart import dmart
 
 
-async def insert_dummy(data: DummyData):
+async def insert_dummy(data: DummyData) -> DmartResponse:
     try:
         return await dmart.create(
             space_name="dummy_space",
@@ -23,7 +23,7 @@ async def insert_dummy(data: DummyData):
     except DmartException as e:
         raise e
 
-async def get_dummies():
+async def get_dummies() -> DmartResponse:
     try:
         response = await dmart.query(
             space_name="dummy_space",
@@ -34,7 +34,7 @@ async def get_dummies():
         raise e
 
 
-async def get_dummy(shortname: str):
+async def get_dummy(shortname: str) -> DmartResponse:
     try:
         response = await dmart.query(
             space_name="dummy_space",
@@ -45,7 +45,7 @@ async def get_dummy(shortname: str):
     except DmartException as e:
         raise e
 
-async def update_dummy(shortname: str, data: DummyData):
+async def update_dummy(shortname: str, data: DummyData) -> DmartResponse:
     try:
         return await dmart.update(
             space_name="dummy_space",
@@ -65,7 +65,7 @@ async def update_dummy(shortname: str, data: DummyData):
     except DmartException as e:
         raise e
 
-async def delete_dummy(shortname: str):
+async def delete_dummy(shortname: str) -> DmartResponse:
     try:
         return await dmart.delete(
             space_name="dummy_space",

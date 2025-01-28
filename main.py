@@ -217,11 +217,11 @@ def mask_sensitive_data(data):
 def set_logging(response, extra, request, exception_data):
     extra = mask_sensitive_data(extra)
     if 400 <= response.status_code < 500:
-        logger.warning("Served request", extra=extra)
+        logger.warning("Served request", extra=extra) # type: ignore
     elif response.status_code >= 500 or exception_data is not None:
-        logger.error("Served request", extra=extra)
+        logger.error("Served request", extra=extra) # type: ignore
     elif request.method != "OPTIONS":  # Do not log OPTIONS request, to reduce excessive logging
-        logger.info("Served request", extra=extra)
+        logger.info("Served request", extra=extra) # type: ignore
 
 
 def set_stack(e):
@@ -315,7 +315,7 @@ async def middle(request: Request, call_next):
             },
         )
         response_body = json.loads(str(response.body, 'utf8'))
-    except Exception as e:
+    except Exception as _:
         exception_message = ""
         stack = None
         if ee := sys.exc_info()[1]:
