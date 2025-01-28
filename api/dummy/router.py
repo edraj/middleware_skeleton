@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 import models.api as api
+from models.dummy import Dummy
 
 router = APIRouter()
 
@@ -13,8 +14,8 @@ async def fetch_dummies() -> api.Response:
     )
 
 
-@router.get("/", response_model=api.Response, response_model_exclude_none=True)
-async def create_dummy() -> api.Response:
+@router.post("/", response_model=api.Response, response_model_exclude_none=True)
+async def create_dummy(dummy: Dummy) -> api.Response:
     return api.Response(
         status=api.Status.success,
         records=[],
@@ -22,8 +23,8 @@ async def create_dummy() -> api.Response:
     )
 
 
-@router.get("/", response_model=api.Response, response_model_exclude_none=True)
-async def update_dummy() -> api.Response:
+@router.put("/", response_model=api.Response, response_model_exclude_none=True)
+async def update_dummy(dummy: Dummy) -> api.Response:
     return api.Response(
         status=api.Status.success,
         records=[],
@@ -31,7 +32,7 @@ async def update_dummy() -> api.Response:
     )
 
 
-@router.get("/", response_model=api.Response, response_model_exclude_none=True)
+@router.delete("/", response_model=api.Response, response_model_exclude_none=True)
 async def delete_dummy() -> api.Response:
     return api.Response(
         status=api.Status.success,
@@ -40,8 +41,8 @@ async def delete_dummy() -> api.Response:
     )
 
 
-@router.get("/", response_model=api.Response, response_model_exclude_none=True)
-async def fetch_by_id_dummy() -> api.Response:
+@router.get("/{shortname}", response_model=api.Response, response_model_exclude_none=True)
+async def fetch_by_shortname_dummy(shortname: str) -> api.Response:
     return api.Response(
         status=api.Status.success,
         records=[],
