@@ -11,4 +11,3 @@ aiohttp
 pyjwt
 jsonschema
 pydmart
-json_logging

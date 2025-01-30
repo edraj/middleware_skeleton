@@ -30,7 +30,6 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from utils.settings import settings
 from asgi_correlation_id import CorrelationIdMiddleware
 from utils.internal_error_code import InternalErrorCode
-import json_logging
 from api.dummy.router import router as dummy_router
 from pydmart.service import DmartException, Error as DmartError, Status as DmartStatus,\
     DmartResponse
@@ -63,7 +62,6 @@ async def lifespan(app: FastAPI):
     print('{"stage":"shutting down"}')
 
 
-json_logging.init_fastapi(enable_json=True)
 app = FastAPI(
     lifespan=lifespan,
     title="Datamart API",
@@ -115,11 +113,7 @@ async def capture_body(request: Request):
 
 @app.exception_handler(StarletteHTTPException)
 async def my_exception_handler(_, exception):
-    return JSONResponse(
-        content=exception.detail,
-        status_code=exception.status_code,
-        headers={"correlation_id": json_logging.get_correlation_id()},
-    )
+    return JSONResponse(content=exception.detail, status_code=exception.status_code)
 
 
 @app.exception_handler(RequestValidationError)
@@ -235,6 +229,7 @@ def set_stack(e):
         if "site-packages" not in frame.f_code.co_filename
     ]
 
+
 @app.middleware("http")
 async def middle(request: Request, call_next):
     """Wrapper function to manage errors and logging"""
@@ -245,9 +240,9 @@ async def middle(request: Request, call_next):
     response_body: str | dict = {}
     exception_data: dict[str, Any] | None = None
 
+
     try:
         response = await asyncio.wait_for(call_next(request), timeout=settings.request_timeout)
-        response.headers["correlation_id"] = json_logging.get_correlation_id()
         raw_response = [section async for section in response.body_iterator]
         response.body_iterator = iterate_in_threadpool(iter(raw_response))
         raw_data = b"".join(raw_response)
@@ -258,14 +253,11 @@ async def middle(request: Request, call_next):
                 response_body = {}
     except asyncio.TimeoutError:
         response = JSONResponse(content={'status':'failed',
-            'error': {"code":504, "message": 'Request processing time exceeded limit'}},
+            'error': {"code":504, "message": 'Request processing time excedeed limit'}},
             status_code=status.HTTP_504_GATEWAY_TIMEOUT)
         response_body = json.loads(str(response.body, 'utf8'))
     except DmartException as e:
         response = JSONResponse(
-            headers={
-                "correlation_id": json_logging.get_correlation_id(),
-            },
             status_code=e.status_code,
             content=jsonable_encoder(
                 DmartResponse(status=DmartStatus.failed, error=e.error)
@@ -278,9 +270,6 @@ async def middle(request: Request, call_next):
         stack = set_stack(e)
         exception_data = {"props": {"exception": str(e), "stack": stack}}
         response = JSONResponse(
-            headers={
-                "correlation_id": json_logging.get_correlation_id(),
-            },
             status_code=422,
             content={
                 "status": "failed",
@@ -297,9 +286,6 @@ async def middle(request: Request, call_next):
         stack = set_stack(e)
         exception_data = {"props": {"exception": str(e), "stack": stack}}
         response = JSONResponse(
-            headers={
-                "correlation_id": json_logging.get_correlation_id(),
-            },
             status_code=400,
             content={
                 "status": "failed",
@@ -315,7 +301,7 @@ async def middle(request: Request, call_next):
             },
         )
         response_body = json.loads(str(response.body, 'utf8'))
-    except Exception as _:
+    except Exception:
         exception_message = ""
         stack = None
         if ee := sys.exc_info()[1]:
@@ -327,9 +313,6 @@ async def middle(request: Request, call_next):
         if settings.debug_enabled:
             error_log["stack"] = stack
         response = JSONResponse(
-            headers={
-                "correlation_id": json_logging.get_correlation_id(),
-            },
             status_code=500,
             content={
                 "status": "failed",
@@ -337,7 +320,6 @@ async def middle(request: Request, call_next):
             },
         )
         response_body = json.loads(str(response.body, 'utf8'))
-
 
     response = set_middleware_response_headers(request, response)
 
@@ -350,6 +332,17 @@ async def middle(request: Request, call_next):
     extra = set_middleware_extra(request, response, start_time, user_shortname, exception_data, response_body)
 
     set_logging(response, extra, request, exception_data)
+
+    #TODO: CHECK THIS
+    # if settings.hide_stack_trace:
+    #     if (
+    #         response_body and isinstance(response_body, dict)
+    #         and "error" in response_body
+    #         and "stack" in response_body["error"]
+    #     ):
+    #         response_body["error"].pop("stack", None)
+    #
+    #     response.body_iterator = iterate_in_threadpool(iter([json.dumps(response_body).encode("utf-8")]))
 
     return response
 
@@ -411,9 +404,6 @@ async def catchall() -> None:
             type="catchall", code=InternalErrorCode.INVALID_ROUTE, message="Requested method or path is invalid"
         ),
     )
-
-
-json_logging.init_request_instrument(app)
 
 async def main():
     config = Config()
