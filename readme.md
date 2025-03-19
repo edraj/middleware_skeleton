@@ -9,10 +9,10 @@
 - clone the repo
 - cd to the project folder
 - `pip install -r requirements.txt`
-- run the seeders using `cd db && python seeder.py`
-This step will create a new folder as a sibling to the project folder called `spaces` that holds the data
-- [Called form Dmart service] configure Dmart server to deal with the new `spaces` folder by updating `SPACES_FOLDER` env var in Dmart itself
-- [Called form Dmart service] recreate Redis DB by calling `./create_index.py --flushall`
-- [Called form Dmart service] [Optional] run Dmart tests to make sure everything configured successfully `cd tests && pytest`
+- On Dmart service
+- - To deal with the new `spaces` folder by updating `SPACES_FOLDER` env var in Dmart itself
+- - If the `active_data_db=file` then recreate Redis DB by calling `./create_index.py --flushall`
+- - If the `active_data_db=sql` then perform migration by calling `./data_adapters/sql/json_to_db_migration.py`
+- - [Optional] run Dmart tests to make sure everything configured successfully `cd tests && pytest`
 - create the logs folder `mkdir ../logs`
 - run the server `./main.py`
