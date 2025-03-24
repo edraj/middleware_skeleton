@@ -1,10 +1,12 @@
-from pydmart.service import ResourceType, DmartException, DmartResponse
+from pydmart.enums import ResourceType
+from pydmart.models import ApiResponse, DmartException
 
 from models.dummy import DummyData
+
 from utils.dmart import dmart
 
 
-async def insert_dummy(data: DummyData) -> DmartResponse:
+async def insert_dummy(data: DummyData) -> ApiResponse:
     try:
         return await dmart.create(
             space_name="dummy_space",
@@ -23,7 +25,7 @@ async def insert_dummy(data: DummyData) -> DmartResponse:
     except DmartException as e:
         raise e
 
-async def get_dummies() -> DmartResponse:
+async def get_dummies() -> ApiResponse:
     try:
         response = await dmart.query(
             space_name="dummy_space",
@@ -34,7 +36,7 @@ async def get_dummies() -> DmartResponse:
         raise e
 
 
-async def get_dummy(shortname: str) -> DmartResponse:
+async def get_dummy(shortname: str) -> ApiResponse:
     try:
         response = await dmart.query(
             space_name="dummy_space",
@@ -45,7 +47,7 @@ async def get_dummy(shortname: str) -> DmartResponse:
     except DmartException as e:
         raise e
 
-async def update_dummy(shortname: str, data: DummyData) -> DmartResponse:
+async def update_dummy(shortname: str, data: DummyData) -> ApiResponse:
     try:
         return await dmart.update(
             space_name="dummy_space",
@@ -65,7 +67,7 @@ async def update_dummy(shortname: str, data: DummyData) -> DmartResponse:
     except DmartException as e:
         raise e
 
-async def delete_dummy(shortname: str) -> DmartResponse:
+async def delete_dummy(shortname: str) -> ApiResponse:
     try:
         return await dmart.delete(
             space_name="dummy_space",

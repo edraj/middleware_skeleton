@@ -32,9 +32,8 @@ from asgi_correlation_id import CorrelationIdMiddleware
 from utils.internal_error_code import InternalErrorCode
 import json_logging
 from api.dummy.router import router as dummy_router
-from pydmart.service import DmartException, Error as DmartError, Status as DmartStatus,\
-    DmartResponse
-from utils.dmart import dmart
+from pydmart.models import DmartException, Error as DmartError, ApiResponse
+from pydmart.enums import Status as DmartStatus
 
 
 @asynccontextmanager
@@ -43,8 +42,9 @@ async def lifespan(app: FastAPI):
     print('{"stage":"starting up"}')
 
     try:
-        await dmart.create_session_pool()
-        await dmart.connect()
+        # await dmart.create_session_pool()
+        # await dmart.connect()
+        pass
     except Exception:
         sys.exit("Failed to connect to DMART")
 
@@ -268,7 +268,7 @@ async def middle(request: Request, call_next):
             },
             status_code=e.status_code,
             content=jsonable_encoder(
-                DmartResponse(status=DmartStatus.failed, error=e.error)
+                ApiResponse(status=DmartStatus.failed, error=e.error)
             ),
         )
         stack = set_stack(e)
@@ -370,7 +370,7 @@ async def root():
 @app.get("/spaces-backup", include_in_schema=False)
 async def space_backup(key: str):
     if not key or key != "ABC":
-        return DmartResponse(
+        return ApiResponse(
             status=DmartStatus.failed,
             error=DmartError(type="git", code=InternalErrorCode.INVALID_APP_KEY, message="Api key is invalid"),
         )
@@ -386,7 +386,7 @@ async def space_backup(key: str):
         "stdout": result_stdout.decode().split("\n"),
         "stderr": result_stderr.decode().split("\n"),
     }
-    return DmartResponse(status=DmartStatus.success, attributes=attributes)
+    return ApiResponse(status=DmartStatus.success, attributes=attributes)
 
 
 app.include_router(

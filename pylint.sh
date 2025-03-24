@@ -1,4 +1,5 @@
 #!/bin/bash
+export PYRIGHT_PYTHON_FORCE_VERSION=latest
 
 echo "Pyright ..."
 python -m pyright .

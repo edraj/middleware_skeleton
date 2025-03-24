@@ -5,7 +5,7 @@ from starlette.requests import Request
 from utils.internal_error_code import InternalErrorCode
 from utils.settings import settings
 from fastapi import status
-from pydmart.service import DmartException, Error as DmartError
+from pydmart.models import Error as DmartError, DmartException
 
 REQUEST_DATA_CTX_KEY = "request_data"
 
