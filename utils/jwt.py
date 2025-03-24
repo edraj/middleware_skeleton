@@ -3,7 +3,7 @@ from time import time
 from typing import Optional, Any
 from fastapi import Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydmart.service import DmartException, Error as DmartError
+from pydmart.models import DmartException, Error as DmartError
 
 from utils.settings import settings
 

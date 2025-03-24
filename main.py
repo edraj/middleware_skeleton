@@ -33,8 +33,8 @@ from asgi_correlation_id import CorrelationIdMiddleware
 from utils.internal_error_code import InternalErrorCode
 import json_logging
 from api.dummy.router import router as dummy_router
-from pydmart.models import DmartException, Error as DmartError, ApiResponse
-from pydmart.enums import Status as DmartStatus, Status
+from pydmart.models import DmartException, Error as DmartError, ApiResponse, ApiResponseRecord
+from pydmart.enums import ResourceType, Status as DmartStatus, Status
 
 
 @asynccontextmanager
@@ -269,7 +269,7 @@ async def middle(request: Request, call_next):
             },
             status_code=e.status_code,
             content=jsonable_encoder(
-                ApiResponse(status=DmartStatus.failed, error=e.error)
+                ApiResponse(status=DmartStatus.failed, error=e.error, records=[])
             ),
         )
         stack = set_stack(e)
@@ -374,6 +374,7 @@ async def space_backup(key: str):
         return ApiResponse(
             status=DmartStatus.failed,
             error=DmartError(type="git", code=InternalErrorCode.INVALID_APP_KEY, message="Api key is invalid"),
+            records=[]
         )
 
     import subprocess
@@ -387,7 +388,7 @@ async def space_backup(key: str):
         "stdout": result_stdout.decode().split("\n"),
         "stderr": result_stderr.decode().split("\n"),
     }
-    return ApiResponse(status=DmartStatus.success, attributes=attributes)
+    return ApiResponse(status=DmartStatus.success, records=[ApiResponseRecord(attributes=attributes, subpath="", resource_type=ResourceType.content, shortname="")])
 
 
 app.include_router(
