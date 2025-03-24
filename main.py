@@ -14,6 +14,7 @@ from urllib.parse import urlparse, quote
 from jsonschema.exceptions import ValidationError as SchemaValidationError
 from pydantic import ValidationError
 
+from utils.dmart import dmart
 from utils.git_info import git_info
 from utils.middleware import CustomRequestMiddleware, ChannelMiddleware
 from utils.jwt import JWTBearer
@@ -33,7 +34,7 @@ from utils.internal_error_code import InternalErrorCode
 import json_logging
 from api.dummy.router import router as dummy_router
 from pydmart.models import DmartException, Error as DmartError, ApiResponse
-from pydmart.enums import Status as DmartStatus
+from pydmart.enums import Status as DmartStatus, Status
 
 
 @asynccontextmanager
@@ -42,9 +43,9 @@ async def lifespan(app: FastAPI):
     print('{"stage":"starting up"}')
 
     try:
-        # await dmart.create_session_pool()
-        # await dmart.connect()
-        pass
+        r = await dmart.login(settings.dmart_username, settings.dmart_password)
+        if r.status == Status.failed:
+            sys.exit("Failed to connect to DMART")
     except Exception:
         sys.exit("Failed to connect to DMART")
 
