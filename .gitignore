@@ -165,3 +165,4 @@ cython_debug/
 
 login_creds.sh
 config.env
+logs
