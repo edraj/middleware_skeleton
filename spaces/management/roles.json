@@ -1,1 +1,0 @@
-{"shortname_title": "Role Shortname", "content_schema_shortnames": [], "index_attributes": [{"key": "shortname", "name": "name"}], "allow_create": true, "allow_update": false, "allow_delete": false, "use_media": false, "filter": [], "allow_view": true}
