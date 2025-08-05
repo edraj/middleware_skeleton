@@ -4,6 +4,7 @@ from starlette.datastructures import UploadFile
 from contextlib import asynccontextmanager
 import asyncio
 import json
+import socket
 from os import getpid
 import sys
 import time
@@ -13,6 +14,7 @@ from typing import Any
 from urllib.parse import urlparse, quote
 from jsonschema.exceptions import ValidationError as SchemaValidationError
 from pydantic import ValidationError
+import re
 
 from utils.dmart import dmart
 from utils.git_info import git_info
@@ -35,6 +37,29 @@ import json_logging
 from api.dummy.router import router as dummy_router
 from pydmart.models import DmartException, Error as DmartError, ApiResponse, ApiResponseRecord
 from pydmart.enums import ResourceType, Status as DmartStatus, Status
+
+# Sensitive keys to mask in logs
+SENSITIVE_KEYS = ("password", "token", "jwt", "otp", "authorization", "auth_token")
+
+
+def mask_sensitive_data(data: Any) -> Any:
+    """Recursively mask sensitive data in dict, list, or string."""
+    if isinstance(data, dict):
+        masked = {}
+        for key, value in data.items():
+            if any(s in key.lower() for s in SENSITIVE_KEYS):
+                masked[key] = "******"
+            else:
+                masked[key] = mask_sensitive_data(value)
+        return masked
+    elif isinstance(data, list):
+        return [mask_sensitive_data(item) for item in data]
+    elif isinstance(data, str):
+        # Optional: Mask tokens in long strings (JWT format)
+        if re.search(r"eyJ[\w-]*\.[\w-]*\.[\w-]*", data):
+            return "******"
+        return data
+    return data
 
 
 @asynccontextmanager
@@ -144,14 +169,15 @@ def set_middleware_extra(request, response, start_time, user_shortname, exceptio
             "timestamp": start_time,
             "duration": 1000 * (time.time() - start_time),
             "server": settings.servername,
+            "hostname": socket.gethostname(),  # Added hostname
             "process_id": getpid(),
             "user_shortname": user_shortname,
             "request": {
                 "url": request.url._url,
                 "verb": request.method,
                 "path": quote(str(request.url.path)),
-                "query_params": dict(request.query_params.items()),
-                "headers": dict(request.headers.items()),
+                "query_params": mask_sensitive_data(dict(request.query_params.items())),
+                "headers": mask_sensitive_data(dict(request.headers.items())),
             },
             "response": {
                 "headers": dict(response.headers.items()),
@@ -162,25 +188,24 @@ def set_middleware_extra(request, response, start_time, user_shortname, exceptio
 
     if exception_data is not None:
         extra["props"]["exception"] = exception_data
-    if (hasattr(request.state, "request_body") and isinstance(extra, dict) and isinstance(extra["props"], dict)
-            and isinstance(extra["props"]["request"], dict)):
-        extra["props"]["request"]["body"] = request.state.request_body
-    if (response_body and isinstance(extra, dict) and isinstance(extra["props"], dict)
-            and isinstance(extra["props"]["response"], dict)):
-        extra["props"]["response"]["body"] = response_body
+    if hasattr(request.state, "request_body"):
+        extra["props"]["request"]["body"] = mask_sensitive_data(request.state.request_body)
+    if response_body:
+        extra["props"]["response"]["body"] = mask_sensitive_data(response_body)
 
     return extra
 
 
 def set_middleware_response_headers(request, response):
-    referer = request.headers.get(
-        "referer",
-        request.headers.get("origin",
-                            request.headers.get("x-forwarded-proto", "http")
-                            + "://"
-                            + request.headers.get(
-                                "x-forwarded-host", f"{settings.listening_host}:{settings.listening_port}"
-                            )),
+    origin = urlparse(
+        request.headers.get(
+            "referer",
+            request.headers.get(
+                "origin",
+                request.headers.get("x-forwarded-proto", "http") + "://" +
+                request.headers.get("x-forwarded-host", f"{settings.listening_host}:{settings.listening_port}")
+            ),
+        )
     )
     origin = urlparse(referer)
     response.headers[
@@ -205,18 +230,7 @@ def set_middleware_response_headers(request, response):
     return response
 
 
-def mask_sensitive_data(data):
-    if isinstance(data, dict):
-        return {k: mask_sensitive_data(v) if k not in ['password', 'access_token', 'refresh_token', 'auth_token'] else '******' for k, v in data.items()}
-    elif isinstance(data, list):
-        return [mask_sensitive_data(item) for item in data]
-    elif isinstance(data, str) and 'auth_token' in data:
-        return '******'
-    return data
-
-
 def set_logging(response, extra, request, exception_data):
-    extra = mask_sensitive_data(extra)
     if 400 <= response.status_code < 500:
         logger.warning("Served request", extra=extra) # type: ignore
     elif response.status_code >= 500 or exception_data is not None:
@@ -263,6 +277,8 @@ async def middle(request: Request, call_next):
             status_code=status.HTTP_504_GATEWAY_TIMEOUT)
         response_body = json.loads(str(response.body, 'utf8'))
     except DmartException as e:
+        stack = set_stack(e)
+        exception_data = {"props": {"exception": str(e), "stack": stack}}
         response = JSONResponse(
             headers={
                 "correlation_id": json_logging.get_correlation_id(),
@@ -272,8 +288,6 @@ async def middle(request: Request, call_next):
                 ApiResponse(status=DmartStatus.failed, error=e.error, records=[])
             ),
         )
-        stack = set_stack(e)
-        exception_data = {"props": {"exception": str(e), "stack": stack}}
         response_body = json.loads(str(response.body, 'utf8'))
     except ValidationError as e:
         stack = set_stack(e)
