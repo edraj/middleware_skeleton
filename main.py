@@ -14,7 +14,6 @@ from typing import Any
 from urllib.parse import urlparse, quote
 from jsonschema.exceptions import ValidationError as SchemaValidationError
 from pydantic import ValidationError
-import re
 
 from utils.dmart import dmart
 from utils.git_info import git_info
@@ -38,28 +37,7 @@ from api.dummy.router import router as dummy_router
 from pydmart.models import DmartException, Error as DmartError, ApiResponse, ApiResponseRecord
 from pydmart.enums import ResourceType, Status as DmartStatus, Status
 
-# Sensitive keys to mask in logs
-SENSITIVE_KEYS = ("password", "token", "jwt", "otp", "authorization", "auth_token")
-
-
-def mask_sensitive_data(data: Any) -> Any:
-    """Recursively mask sensitive data in dict, list, or string."""
-    if isinstance(data, dict):
-        masked = {}
-        for key, value in data.items():
-            if any(s in key.lower() for s in SENSITIVE_KEYS):
-                masked[key] = "******"
-            else:
-                masked[key] = mask_sensitive_data(value)
-        return masked
-    elif isinstance(data, list):
-        return [mask_sensitive_data(item) for item in data]
-    elif isinstance(data, str):
-        # Optional: Mask tokens in long strings (JWT format)
-        if re.search(r"eyJ[\w-]*\.[\w-]*\.[\w-]*", data):
-            return "******"
-        return data
-    return data
+from utils.masking import mask_sensitive_data
 
 
 @asynccontextmanager
@@ -117,15 +95,14 @@ async def capture_body(request: Request):
     request.state.request_body = {}
 
     if (
-            request.method == "POST"
-            and "application/json" in request.headers.get("content-type", "")
+        request.method == "POST"
+        and "application/json" in request.headers.get("content-type", "")
     ):
         request.state.request_body = await request.json()
 
     if (
-            request.method == "POST"
-            and request.headers.get("content-type")
-            and "multipart/form-data" in request.headers.get("content-type", [])
+        request.method == "POST"
+        and "multipart/form-data" in request.headers.get("content-type", "")
     ):
         form = await request.form()
         for field in form:
@@ -154,7 +131,10 @@ async def validation_exception_handler(_: Request, exc: RequestValidationError):
     raise DmartException(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         error=DmartError(
-            code=InternalErrorCode.UNPROCESSABLE_ENTITY, type="validation", message="Validation error [1]", info=err
+            code=InternalErrorCode.UNPROCESSABLE_ENTITY,
+            type="validation",
+            message="Validation error [1]",
+            info=err,
         ),
     )
 
@@ -163,13 +143,20 @@ app.add_middleware(CustomRequestMiddleware)
 app.add_middleware(ChannelMiddleware)
 
 
-def set_middleware_extra(request, response, start_time, user_shortname, exception_data, response_body):
-    extra = {
+def set_middleware_extra(
+    request: Request,
+    response: Response,
+    start_time: float,
+    user_shortname: str,
+    exception_data: dict[str, Any] | None,
+    response_body: Any,
+) -> dict[str, Any]:
+    extra: dict[str, Any] = {
         "props": {
             "timestamp": start_time,
             "duration": 1000 * (time.time() - start_time),
             "server": settings.servername,
-            "hostname": socket.gethostname(),  # Added hostname
+            "hostname": socket.gethostname(),
             "process_id": getpid(),
             "user_shortname": user_shortname,
             "request": {
@@ -177,7 +164,7 @@ def set_middleware_extra(request, response, start_time, user_shortname, exceptio
                 "verb": request.method,
                 "path": quote(str(request.url.path)),
                 "query_params": mask_sensitive_data(dict(request.query_params.items())),
-                "headers": mask_sensitive_data(dict(request.headers.items())),
+                "headers": mask_sensitive_data(dict(request.headers.items()), parent_key="headers"),
             },
             "response": {
                 "headers": dict(response.headers.items()),
@@ -196,25 +183,22 @@ def set_middleware_extra(request, response, start_time, user_shortname, exceptio
     return extra
 
 
-def set_middleware_response_headers(request, response):
-    origin = urlparse(
+def set_middleware_response_headers(request: Request, response: Response) -> Response:
+    referer = request.headers.get(
+        "referer",
         request.headers.get(
-            "referer",
-            request.headers.get(
-                "origin",
-                request.headers.get("x-forwarded-proto", "http") + "://" +
-                request.headers.get("x-forwarded-host", f"{settings.listening_host}:{settings.listening_port}")
+            "origin",
+            request.headers.get("x-forwarded-proto", "http")
+            + "://"
+            + request.headers.get(
+                "x-forwarded-host",
+                f"{settings.listening_host}:{settings.listening_port}",
             ),
-        )
+        ),
     )
     origin = urlparse(referer)
-    response.headers[
-        "Access-Control-Allow-Origin"
-    ] = f"{origin.scheme}://{origin.netloc}"
 
-    # if "localhost" in response.headers["Access-Control-Allow-Origin"]:
-    #     response.headers["Access-Control-Allow-Origin"] = "*"
-
+    response.headers["Access-Control-Allow-Origin"] = f"{origin.scheme}://{origin.netloc}"
     response.headers["Access-Control-Allow-Credentials"] = "true"
     response.headers["Access-Control-Allow-Headers"] = "content-type, charset, authorization, accept-language, content-length"
     response.headers["Access-Control-Max-Age"] = "600"
@@ -230,16 +214,16 @@ def set_middleware_response_headers(request, response):
     return response
 
 
-def set_logging(response, extra, request, exception_data):
+def set_logging(response: Response, extra: dict[str, Any], request: Request, exception_data: dict[str, Any] | None) -> None:
     if 400 <= response.status_code < 500:
-        logger.warning("Served request", extra=extra) # type: ignore
+        logger.warning("Served request", extra=extra)  # type: ignore
     elif response.status_code >= 500 or exception_data is not None:
         logger.error("Served request", extra=extra) # type: ignore
     elif request.method != "OPTIONS":  # Do not log OPTIONS request, to reduce excessive logging
         logger.info("Served request", extra=extra) # type: ignore
 
 
-def set_stack(e):
+def set_stack(e: Exception) -> list[dict[str, Any]]:
     return [
         {
             "file": frame.f_code.co_filename,
@@ -272,10 +256,11 @@ async def middle(request: Request, call_next):
             except Exception:
                 response_body = {}
     except asyncio.TimeoutError:
-        response = JSONResponse(content={'status':'failed',
-            'error': {"code":504, "message": 'Request processing time exceeded limit'}},
-            status_code=status.HTTP_504_GATEWAY_TIMEOUT)
-        response_body = json.loads(str(response.body, 'utf8'))
+        response = JSONResponse(
+            content={"status": "failed", "error": {"code": 504, "message": "Request processing time exceeded limit"}},
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+        )
+        response_body = json.loads(str(response.body, "utf8"))
     except DmartException as e:
         stack = set_stack(e)
         exception_data = {"props": {"exception": str(e), "stack": stack}}
@@ -288,7 +273,7 @@ async def middle(request: Request, call_next):
                 ApiResponse(status=DmartStatus.failed, error=e.error, records=[])
             ),
         )
-        response_body = json.loads(str(response.body, 'utf8'))
+        response_body = json.loads(str(response.body, "utf8"))
     except ValidationError as e:
         stack = set_stack(e)
         exception_data = {"props": {"exception": str(e), "stack": stack}}
@@ -307,7 +292,7 @@ async def middle(request: Request, call_next):
                 },
             },
         )
-        response_body = json.loads(str(response.body, 'utf8'))
+        response_body = json.loads(str(response.body, "utf8"))
     except SchemaValidationError as e:
         stack = set_stack(e)
         exception_data = {"props": {"exception": str(e), "stack": stack}}
@@ -329,8 +314,8 @@ async def middle(request: Request, call_next):
                 },
             },
         )
-        response_body = json.loads(str(response.body, 'utf8'))
-    except Exception as _:
+        response_body = json.loads(str(response.body, "utf8"))
+    except Exception:
         exception_message = ""
         stack = None
         if ee := sys.exc_info()[1]:
@@ -338,7 +323,7 @@ async def middle(request: Request, call_next):
             exception_message = str(ee)
             exception_data = {"props": {"exception": str(ee), "stack": stack}}
 
-        error_log = {"type": "general", "code": 99, "message": exception_message}
+        error_log: dict[str, Any] = {"type": "general", "code": 99, "message": exception_message}
         if settings.debug_enabled:
             error_log["stack"] = stack
         response = JSONResponse(
@@ -371,7 +356,7 @@ async def middle(request: Request, call_next):
 
 app.add_middleware(
     CorrelationIdMiddleware,
-    header_name='X-Correlation-ID',
+    header_name="X-Correlation-ID",
     update_request_header=False,
     validator=None,
 )
@@ -388,7 +373,7 @@ async def space_backup(key: str):
         return ApiResponse(
             status=DmartStatus.failed,
             error=DmartError(type="git", code=InternalErrorCode.INVALID_APP_KEY, message="Api key is invalid"),
-            records=[]
+            records=[],
         )
 
     import subprocess
